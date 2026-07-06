@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset=utf-8>
+<title>MeWorld AR Heart Flyer</title>
+<style>
+  @page { size:A4; margin:0.5cm; }
+  body { font-family:system-ui,Arial,sans-serif; margin:0; padding:0; }
+  .page { width:210mm; margin:0 auto; }
+  .header { text-align:center; border-bottom:3px solid #cc2244; padding:16px 0; }
+  .header h1 { color:#cc2244; font-size:28px; margin:0; }
+  .header p { color:#666; font-size:14px; margin:4px 0 0; }
+
+  .content { display:flex; gap:24px; padding:24px 0; }
+  .col { flex:1; }
+
+  .marker-box { text-align:center; border:2px solid #ddd; border-radius:12px; padding:16px; }
+  .marker-box img { max-width:100%; height:auto; }
+  .marker-box p { color:#888; font-size:11px; margin:8px 0 0; }
+
+  .qr-box { text-align:center; padding:16px; }
+  .qr-box img { max-width:200px; height:auto; }
+  .qr-box p { color:#666; font-size:12px; }
+
+  .steps { margin:16px 0; }
+  .steps h3 { color:#333; }
+  .steps ol { color:#555; font-size:14px; line-height:2; }
+  .steps li { padding-left:4px; }
+
+  .footer { text-align:center; color:#999; font-size:11px; border-top:1px solid #eee; padding:16px 0; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="header">
+    <h1>MeWorld AR Heart</h1>
+    <p>Scan the QR code • Aim at the marker</p>
+  </div>
+
+  <div class="content">
+    <div class="col">
+      <div class="marker-box">
+        <img src="https://raw.githubusercontent.com/stemkoski/AR-Examples/master/markers/hiro.png" alt="Hiro Marker">
+        <p><b>TRACKING MARKER</b> — Point your camera here</p>
+      </div>
+    </div>
+    <div class="col">
+      <div class="qr-box">
+        <img src="qr-iphone.png" alt="QR code" style="max-width:200px">
+        <p><b>SCAN</b> to open on your phone</p>
+        <p style="font-size:10px;color:#aaa">meworld-heart.loca.lt</p>
+      </div>
+      <div class="steps">
+        <h3>How it works</h3>
+        <ol>
+          <li>Print this page (or open on a second screen)</li>
+          <li>Scan the QR code with your phone</li>
+          <li>Point your phone camera at the ⬛ marker</li>
+          <li>A 3D beating heart appears above it</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    Inspired by <a href="https://www.instagram.com/p/DZ5zg9cRSk6" style="color:#999">@thesunkenblimp</a> •
+    Powered by <a href="https://github.com/stemkoski/AR-Examples" style="color:#999">stemkoski/AR-Examples</a>
+  </div>
+</div>
+</body>
+</html>

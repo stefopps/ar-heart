@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>AR Heart — MeWorld</title>
+<style>
+  html, body { margin:0; padding:0; overflow:hidden; background:#000; font-family:system-ui,sans-serif; }
+  #ui { position:fixed; inset:0; z-index:10; pointer-events:none; }
+  #ui > * { pointer-events:auto; }
+
+  .top-bar {
+    display:flex; justify-content:space-between; padding:12px 16px;
+    background:linear-gradient(180deg,rgba(0,0,0,0.7) 0%,transparent 100%);
+  }
+  .badge {
+    background:rgba(10,10,20,0.85); backdrop-filter:blur(12px);
+    border:1px solid rgba(255,255,255,0.1); border-radius:10px; padding:6px 12px;
+  }
+  .badge .label { color:#888; font-size:9px; text-transform:uppercase; letter-spacing:1px; }
+  .badge .value { color:#e0e0e0; font-weight:600; font-size:13px; }
+
+  .status-bar {
+    position:fixed; bottom:100px; left:50%; transform:translateX(-50%);
+    background:rgba(10,10,20,0.9); border:1px solid rgba(0,229,160,0.3);
+    border-radius:20px; padding:10px 24px; color:#00e5a0; font-size:14px;
+    transition:all 0.4s; opacity:0;
+  }
+  .status-bar.visible { opacity:1; }
+  @keyframes pulse {
+    0%,100% { border-color:rgba(0,229,160,0.3); }
+    50% { border-color:rgba(0,229,160,0.8); }
+  }
+  .status-bar.found { animation:pulse 1.5s infinite; }
+
+  .info-panel {
+    position:fixed; right:12px; top:50%; transform:translateY(-50%);
+    background:rgba(10,10,20,0.9); backdrop-filter:blur(16px);
+    border:1px solid rgba(255,255,255,0.1); border-radius:14px;
+    padding:14px; width:170px; color:#e0e0e0; font-size:11px;
+    transition:all 0.5s cubic-bezier(0.16,1,0.3,1);
+    opacity:0; transform:translateY(-50%) translateX(20px);
+  }
+  .info-panel.visible { opacity:1; transform:translateY(-50%) translateX(0); }
+  .info-panel h3 { color:#00e5a0; font-size:14px; margin:0 0 8px 0; }
+  .info-panel .row { display:flex; justify-content:space-between; padding:3px 0; border-bottom:1px solid rgba(255,255,255,0.06); }
+  .info-panel .key { color:#888; }
+  .info-panel .note { color:#666; font-size:9px; margin-top:8px; }
+
+  .instructions {
+    position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
+    color:#888; font-size:12px; text-align:center; transition:opacity 0.5s;
+  }
+  .instructions.hidden { opacity:0; }
+
+  #loading {
+    position:fixed; inset:0; z-index:999; background:#0a0a0f;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    color:#e0e0e0; transition:opacity 0.6s;
+  }
+  #loading.gone { opacity:0; pointer-events:none; }
+  #loading .spinner {
+    width:36px; height:36px; border:3px solid rgba(255,255,255,0.1);
+    border-top-color:#00e5a0; border-radius:50%; margin:16px 0;
+    animation:spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  #loading p { font-size:14px; }
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <p>MeWorld AR Heart</p>
+  <div class="spinner"></div>
+  <p style="color:#888;font-size:12px">Starting camera...</p>
+</div>
+
+<div id="ui">
+  <div class="top-bar">
+    <div class="badge"><div class="label">MeWorld AR</div><div class="value">Anatomical Heart</div></div>
+    <div class="badge"><div class="label">Inspired</div><div class="value">@thesunkenblimp</div></div>
+  </div>
+</div>
+
+<div class="status-bar" id="status">Point camera at the Hiro marker on your flyer</div>
+<div class="info-panel" id="info">
+  <h3>Anatomical Heart</h3>
+  <div class="row"><span class="key">BPM</span><span class="val" id="bpm">72</span></div>
+  <div class="row"><span class="key">Rhythm</span><span class="val">Sinus</span></div>
+  <div class="row"><span class="key">EF</span><span class="val">60%</span></div>
+  <div class="note">Move flyer to rotate<br>Closer = zoom</div>
+</div>
+<div class="instructions" id="instr">Point camera at the ⬛ <b>Hiro marker</b> ⬛ on your printed flyer</div>
+
+<script src="js/three.js"></script>
+<script src="jsartoolkit5/artoolkit.min.js"></script>
+<script src="jsartoolkit5/artoolkit.api.js"></script>
+<script src="threex/threex-artoolkitsource.js"></script>
+<script src="threex/threex-artoolkitcontext.js"></script>
+<script src="threex/threex-arbasecontrols.js"></script>
+<script src="threex/threex-armarkercontrols.js"></script>
+
+<script>
+var scene, camera, renderer, clock, deltaTime, totalTime;
+var arToolkitSource, arToolkitContext;
+var markerRoot, heartGroup;
+var markerFound = false;
+var bpmInterval;
+
+initialize();
+animate();
+
+function initialize() {
+  scene = new THREE.Scene();
+  scene.add(new THREE.AmbientLight(0xcccccc, 0.6));
+
+  camera = new THREE.Camera();
+  scene.add(camera);
+
+  renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+  renderer.setClearColor(new THREE.Color('lightgrey'), 0);
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.domElement.style.position = 'absolute';
+  renderer.domElement.style.top = '0px';
+  renderer.domElement.style.left = '0px';
+  document.body.appendChild(renderer.domElement);
+
+  clock = new THREE.Clock();
+  deltaTime = 0;
+  totalTime = 0;
+
+  // AR source
+  arToolkitSource = new THREEx.ArToolkitSource({ sourceType:'webcam' });
+
+  function onResize() {
+    arToolkitSource.onResize();
+    arToolkitSource.copySizeTo(renderer.domElement);
+    if (arToolkitContext.arController !== null) {
+      arToolkitSource.copySizeTo(arToolkitContext.arController.canvas);
+    }
+  }
+
+  arToolkitSource.init(function onReady() {
+    onResize();
+    document.getElementById('loading').classList.add('gone');
+    document.getElementById('status').classList.add('visible');
+  });
+
+  window.addEventListener('resize', onResize);
+
+  // AR context
+  arToolkitContext = new THREEx.ArToolkitContext({
+    cameraParametersUrl:'data/camera_para.dat',
+    detectionMode:'mono'
+  });
+
+  arToolkitContext.init(function onCompleted() {
+    camera.projectionMatrix.copy(arToolkitContext.getProjectionMatrix());
+  });
+
+  // Marker
+  markerRoot = new THREE.Group();
+  scene.add(markerRoot);
+  var markerControls = new THREEx.ArMarkerControls(arToolkitContext, markerRoot, {
+    type:'pattern', patternUrl:'data/hiro.patt',
+  });
+
+  // ---- BUILD 3D HEART ----
+  heartGroup = createHeart();
+  heartGroup.position.y = 0.6;
+  heartGroup.scale.set(0.55, 0.55, 0.55);
+  markerRoot.add(heartGroup);
+
+  // Marker events
+  markerRoot.addEventListener('markerFound', function() {
+    markerFound = true;
+    var s = document.getElementById('status');
+    s.textContent = 'Heart detected — tracking';
+    s.classList.add('found');
+    document.getElementById('info').classList.add('visible');
+    document.getElementById('instr').classList.add('hidden');
+    startBPM();
+  });
+  markerRoot.addEventListener('markerLost', function() {
+    markerFound = false;
+    var s = document.getElementById('status');
+    s.textContent = 'Marker lost — point camera at flyer';
+    s.classList.remove('found');
+    document.getElementById('info').classList.remove('visible');
+    document.getElementById('instr').classList.remove('hidden');
+  });
+}
+
+function createHeart() {
+  var g = new THREE.Group();
+
+  // Main heart body — two ellipsoids
+  var mat = new THREE.MeshPhongMaterial({ color:0xcc2244, shininess:80, specular:0xff8888, flatShading:false });
+
+  var body1 = new THREE.Mesh(new THREE.SphereGeometry(0.35, 32, 32), mat);
+  body1.position.set(0.05, 0, 0.05);
+  body1.scale.set(1, 1.15, 0.85);
+  g.add(body1);
+
+  var body2 = new THREE.Mesh(new THREE.SphereGeometry(0.38, 32, 32), mat.clone());
+  body2.material.color.set(0xbb1133);
+  body2.position.set(-0.05, 0.03, -0.05);
+  body2.scale.set(0.9, 1.05, 0.82);
+  g.add(body2);
+
+  var body3 = new THREE.Mesh(new THREE.SphereGeometry(0.36, 32, 32), mat.clone());
+  body3.material.color.set(0xdd3355);
+  body3.position.set(0, -0.04, 0);
+  body3.scale.set(0.95, 0.9, 0.88);
+  g.add(body3);
+
+  // Aorta
+  var vesselMat = new THREE.MeshPhongMaterial({ color:0xdd4455, shininess:90, specular:0xffffff });
+  var aorta = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 0.45, 24), vesselMat);
+  aorta.position.set(0.02, 0.6, 0.02);
+  aorta.rotation.z = 0.2;
+  g.add(aorta);
+
+  // Pulmonary artery (blue tint)
+  var paMat = new THREE.MeshPhongMaterial({ color:0x4466cc, shininess:80, specular:0x8888ff });
+  var pa = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.04, 0.35, 20), paMat);
+  pa.position.set(-0.06, 0.5, 0.08);
+  pa.rotation.z = -0.3;
+  pa.rotation.x = 0.15;
+  g.add(pa);
+
+  // SVC / IVC
+  var svc = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.035, 0.25, 20), paMat);
+  svc.position.set(-0.12, 0.42, 0);
+  svc.rotation.z = 0.1;
+  g.add(svc);
+
+  var ivc = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.038, 0.22, 20), paMat);
+  ivc.position.set(-0.06, -0.45, 0);
+  ivc.rotation.z = -0.08;
+  g.add(ivc);
+
+  // Beating animation
+  g.userData = {
+    baseScale: g.scale.clone(),
+    beatPhase: 0
+  };
+
+  // Lighting fix
+  var light1 = new THREE.DirectionalLight(0xffffff, 1.2);
+  light1.position.set(2, 3, 4);
+  g.add(light1);
+
+  var light2 = new THREE.DirectionalLight(0xff6060, 0.6);
+  light2.position.set(-2, -1, 2);
+  g.add(light2);
+
+  return g;
+}
+
+function startBPM() {
+  if (bpmInterval) return;
+  bpmInterval = setInterval(function() {
+    var el = document.getElementById('bpm');
+    if (el) el.textContent = 68 + Math.floor(Math.sin(Date.now()/2500) * 8);
+  }, 600);
+}
+
+function update() {
+  if (arToolkitSource.ready !== false) {
+    arToolkitContext.update(arToolkitSource.domElement);
+  }
+
+  // Heart beat animation
+  if (heartGroup && markerFound) {
+    var beat = 1 + Math.sin(Date.now() * 0.008) * 0.03;
+    heartGroup.scale.set(0.55 * beat, 0.55 * beat, 0.55 * beat);
+  }
+}
+
+function render() {
+  renderer.render(scene, camera);
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  update();
+  render();
+}
+</script>
+</body>
+</html>
