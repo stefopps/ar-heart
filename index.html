@@ -47,6 +47,10 @@
   .info-panel .key { color:#888; }
   .info-panel .note { color:#666; font-size:9px; margin-top:8px; }
 
+.marker-overlay { position:fixed; inset:0; z-index:100; background:rgba(0,0,0,0.85); display:flex; align-items:center; justify-content:center; }
+  .marker-overlay.hidden { display:none; }
+  .marker-card { text-align:center; color:#e0e0e0; }
+  .marker-card h3 { color:#00e5a0; font-size:18px; margin-bottom:16px; }
   .instructions {
     position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
     color:#888; font-size:12px; text-align:center; transition:opacity 0.5s;
@@ -91,6 +95,16 @@
   <div class="row"><span class="key">EF</span><span class="val">60%</span></div>
   <div class="note">Move flyer to rotate<br>Closer = zoom</div>
 </div>
+
+<div class="marker-overlay" id="markerOverlay">
+  <div class="marker-card">
+    <h3>Point camera at this marker</h3>
+    <img src="hiro_marker.png" alt="Hiro Marker" style="width:200px;height:200px;border:2px solid #333;border-radius:8px">
+    <p style="color:#888;font-size:11px;margin-top:8px">Display on another screen or print</p>
+    <button onclick="document.getElementById('markerOverlay').classList.add('hidden')" style="margin-top:12px;padding:10px 30px;background:#00e5a0;color:#000;border:none;border-radius:8px;font-weight:600;font-size:14px">Got it</button>
+  </div>
+</div>
+
 <div class="instructions" id="instr">Point camera at the ⬛ <b>Hiro marker</b> ⬛ on your printed flyer</div>
 
 <script src="js/three.js"></script>
