@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
-<title>AR Heart — MeWorld</title>
+<title>AR Racer — MeWorld</title>
 <style>
   html, body { margin:0; padding:0; overflow:hidden; background:#000; font-family:system-ui,sans-serif; }
   #ui { position:fixed; inset:0; z-index:10; pointer-events:none; }
@@ -75,24 +75,24 @@
 <body>
 
 <div id="loading">
-  <p>MeWorld AR Heart</p>
+  <p>MeWorld AR Racer</p>
   <div class="spinner"></div>
   <p style="color:#888;font-size:12px">Starting camera...</p>
 </div>
 
 <div id="ui">
   <div class="top-bar">
-    <div class="badge"><div class="label">MeWorld AR</div><div class="value">Anatomical Heart</div></div>
+    <div class="badge"><div class="label">MeWorld AR</div><div class="value">Crimson Racer</div></div>
     <div class="badge"><div class="label">Inspired</div><div class="value">@thesunkenblimp</div></div>
   </div>
 </div>
 
 <div class="status-bar" id="status">Point camera at the Hiro marker on your flyer</div>
 <div class="info-panel" id="info">
-  <h3>Anatomical Heart</h3>
-  <div class="row"><span class="key">BPM</span><span class="val" id="bpm">72</span></div>
-  <div class="row"><span class="key">Rhythm</span><span class="val">Sinus</span></div>
-  <div class="row"><span class="key">EF</span><span class="val">60%</span></div>
+  <h3>Crimson Racer</h3>
+  <div class="row"><span class="key">Model</span><span class="val">GLTF 2.0</span></div>
+  <div class="row"><span class="key">Polygons</span><span class="val">Meshy AI</span></div>
+  <div class="row"><span class="key">Status</span><span class="val" id="statusVal">Ready</span></div>
   <div class="note">Move flyer to rotate<br>Closer = zoom</div>
 </div>
 
@@ -108,6 +108,7 @@
 <div class="instructions" id="instr">Point camera at the ⬛ <b>Hiro marker</b> ⬛ on your printed flyer</div>
 
 <script src="js/three.js"></script>
+<script src="js/GLTFLoader.js"></script>
 <script src="jsartoolkit5/artoolkit.min.js"></script>
 <script src="jsartoolkit5/artoolkit.api.js"></script>
 <script src="threex/threex-artoolkitsource.js"></script>
@@ -120,7 +121,6 @@ var scene, camera, renderer, clock, deltaTime, totalTime;
 var arToolkitSource, arToolkitContext;
 var markerRoot, heartGroup;
 var markerFound = false;
-var bpmInterval;
 
 initialize();
 animate();
@@ -180,21 +180,39 @@ function initialize() {
     type:'pattern', patternUrl:'data/hiro.patt',
   });
 
-  // ---- BUILD 3D HEART ----
-  heartGroup = createHeart();
-  heartGroup.position.y = 0.6;
-  heartGroup.scale.set(0.55, 0.55, 0.55);
+  // ---- LOAD GLB MODEL ----
+  var loader = new THREE.GLTFLoader();
+  heartGroup = new THREE.Group();
   markerRoot.add(heartGroup);
+
+  loader.load('models/Meshy_AI_Crimson_Polygon_Racer_0717124504_texture.glb', function(gltf) {
+    var model = gltf.scene;
+    // Center and scale the model
+    var box = new THREE.Box3().setFromObject(model);
+    var size = box.getSize(new THREE.Vector3());
+    var maxDim = Math.max(size.x, size.y, size.z);
+    var scale = 0.8 / maxDim;
+    model.scale.set(scale, scale, scale);
+    model.position.set(0, 0.3, 0);
+    heartGroup.add(model);
+    document.getElementById('statusVal').textContent = 'Loaded';
+    console.log('GLB loaded:', gltf);
+  }, function(xhr) {
+    var pct = Math.round(xhr.loaded / xhr.total * 100);
+    document.getElementById('statusVal').textContent = 'Loading ' + pct + '%';
+  }, function(err) {
+    document.getElementById('statusVal').textContent = 'Error';
+    console.error('GLB load error:', err);
+  });
 
   // Marker events
   markerRoot.addEventListener('markerFound', function() {
     markerFound = true;
     var s = document.getElementById('status');
-    s.textContent = 'Heart detected — tracking';
+    s.textContent = 'Racer detected — tracking';
     s.classList.add('found');
     document.getElementById('info').classList.add('visible');
     document.getElementById('instr').classList.add('hidden');
-    startBPM();
   });
   markerRoot.addEventListener('markerLost', function() {
     markerFound = false;
@@ -206,90 +224,9 @@ function initialize() {
   });
 }
 
-function createHeart() {
-  var g = new THREE.Group();
-
-  // Main heart body — two ellipsoids
-  var mat = new THREE.MeshPhongMaterial({ color:0xcc2244, shininess:80, specular:0xff8888, flatShading:false });
-
-  var body1 = new THREE.Mesh(new THREE.SphereGeometry(0.35, 32, 32), mat);
-  body1.position.set(0.05, 0, 0.05);
-  body1.scale.set(1, 1.15, 0.85);
-  g.add(body1);
-
-  var body2 = new THREE.Mesh(new THREE.SphereGeometry(0.38, 32, 32), mat.clone());
-  body2.material.color.set(0xbb1133);
-  body2.position.set(-0.05, 0.03, -0.05);
-  body2.scale.set(0.9, 1.05, 0.82);
-  g.add(body2);
-
-  var body3 = new THREE.Mesh(new THREE.SphereGeometry(0.36, 32, 32), mat.clone());
-  body3.material.color.set(0xdd3355);
-  body3.position.set(0, -0.04, 0);
-  body3.scale.set(0.95, 0.9, 0.88);
-  g.add(body3);
-
-  // Aorta
-  var vesselMat = new THREE.MeshPhongMaterial({ color:0xdd4455, shininess:90, specular:0xffffff });
-  var aorta = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 0.45, 24), vesselMat);
-  aorta.position.set(0.02, 0.6, 0.02);
-  aorta.rotation.z = 0.2;
-  g.add(aorta);
-
-  // Pulmonary artery (blue tint)
-  var paMat = new THREE.MeshPhongMaterial({ color:0x4466cc, shininess:80, specular:0x8888ff });
-  var pa = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.04, 0.35, 20), paMat);
-  pa.position.set(-0.06, 0.5, 0.08);
-  pa.rotation.z = -0.3;
-  pa.rotation.x = 0.15;
-  g.add(pa);
-
-  // SVC / IVC
-  var svc = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.035, 0.25, 20), paMat);
-  svc.position.set(-0.12, 0.42, 0);
-  svc.rotation.z = 0.1;
-  g.add(svc);
-
-  var ivc = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.038, 0.22, 20), paMat);
-  ivc.position.set(-0.06, -0.45, 0);
-  ivc.rotation.z = -0.08;
-  g.add(ivc);
-
-  // Beating animation
-  g.userData = {
-    baseScale: g.scale.clone(),
-    beatPhase: 0
-  };
-
-  // Lighting fix
-  var light1 = new THREE.DirectionalLight(0xffffff, 1.2);
-  light1.position.set(2, 3, 4);
-  g.add(light1);
-
-  var light2 = new THREE.DirectionalLight(0xff6060, 0.6);
-  light2.position.set(-2, -1, 2);
-  g.add(light2);
-
-  return g;
-}
-
-function startBPM() {
-  if (bpmInterval) return;
-  bpmInterval = setInterval(function() {
-    var el = document.getElementById('bpm');
-    if (el) el.textContent = 68 + Math.floor(Math.sin(Date.now()/2500) * 8);
-  }, 600);
-}
-
 function update() {
   if (arToolkitSource.ready !== false) {
     arToolkitContext.update(arToolkitSource.domElement);
-  }
-
-  // Heart beat animation
-  if (heartGroup && markerFound) {
-    var beat = 1 + Math.sin(Date.now() * 0.008) * 0.03;
-    heartGroup.scale.set(0.55 * beat, 0.55 * beat, 0.55 * beat);
   }
 }
 

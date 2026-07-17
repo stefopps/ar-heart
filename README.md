@@ -3,14 +3,43 @@
 WebAR anatomical heart that appears when you point your phone camera at a Hiro marker.
 Built with Three.js + ARToolkit, deployed via GitHub Pages.
 
-## Quick Start
+## Quick Launch (Desktop Flyer)
 
-1. **Scan the QR code** on the flyer (or open `https://stefopps.github.io/ar-heart` on your phone)
-2. **Allow camera** access when prompted
-3. **Point your camera** at the Hiro marker (the black square pattern on the printed flyer or another screen)
-4. A 3D **beating anatomical heart** appears above the marker with a vitals panel (BPM, Rhythm, EF%)
+Open the flyer in a browser — it shows the QR code and Hiro marker side by side.
+Display it on a second screen or print it, then scan the QR with your phone.
 
-The flyer is at [`flyer.html`](flyer.html) — print it or display on a second screen. It contains both the QR code and the Hiro marker side by side.
+```
+file:///C:/Users/steve/Augmented%20Reality/ar-heart/flyer.html
+```
+
+**Launch commands** (Cursor agent / PowerShell):
+
+```powershell
+Start-Process "file:///C:/Users/steve/Augmented%20Reality/ar-heart/flyer.html"
+```
+
+To also open the AR experience on desktop:
+
+```powershell
+Start-Process "C:\Users\steve\Augmented Reality\ar-heart\index.html"
+```
+
+### Dev Server (for phone access)
+
+Start the local server on port 8443:
+
+```powershell
+Set-Location "C:\Users\steve\Augmented Reality\ar-heart"
+python -c "import http.server; h=http.server.SimpleHTTPRequestHandler; h.extensions_map['.js']='application/javascript'; h.extensions_map['.dat']='application/octet-stream'; h.extensions_map['.patt']='application/octet-stream'; h.extensions_map['.wasm']='application/wasm'; s=http.server.HTTPServer(('0.0.0.0',8443),h); print('AR Heart on http://localhost:8443'); s.serve_forever()"
+```
+
+## Quick Start (User)
+
+1. **Open the flyer** on your desktop (`flyer.html`) — QR code + Hiro marker side by side
+2. **Scan the QR code** with your phone (or open `https://stefopps.github.io/ar-heart`)
+3. **Allow camera** access when prompted
+4. **Point your phone camera** at the Hiro marker on the flyer
+5. A 3D **beating anatomical heart** appears above the marker with a vitals panel (BPM, Rhythm, EF%)
 
 ## How It Works
 
