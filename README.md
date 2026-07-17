@@ -42,21 +42,25 @@ The model is loaded in `index.html` via GLTFLoader (~line 183). To swap:
 3. **Stage, commit, push:**
 ```powershell
 Set-Location "C:\Users\steve\Augmented Reality\ar-heart"
-git add index.html README.md models/ js/
-git commit -m "swap model: <description>"
+# Bump the cache version on every deploy (prevents stale CDN/phone cache)
+python -q -c "import qrcode; qr = qrcode.QRCode(box_size=10, border=4); qr.add_data('https://stefopps.github.io/ar-heart?v=N'); qr.make(fit=True); img = qr.make_image(fill_color='black', back_color='white'); img.save('qr-iphone.png'); print('QR regenerated')"
+git add index.html README.md models/ js/ qr-iphone.png flyer.html
+git commit -m "swap model: <description>, v=N cache-bust"
 git push origin master
 ```
-4. **Verify** — open `https://stefopps.github.io/ar-heart` and confirm the new model renders. If it doesn't, you forgot to push.
+4. **Wait 5 minutes** — GitHub Pages CDN (Fastly) has a `max-age=300` TTL. Testing immediately will serve stale.
+5. **Verify** — open `https://stefopps.github.io/ar-heart?v=N` with the new version number. If the UI doesn't match, check the deploy comment at the top of the page source.
 
 ### Where to Edit in index.html
 
 | What | Line/Area |
 |------|-----------|
+| **Deploy stamp** | `<!-- deploy:... -->` comment at line 2 — update timestamp on every push |
 | Page title | `<title>` in `<head>` |
 | Loading text | `<p>MeWorld AR ___</p>` in `#loading` div |
 | Top badge | `<div class="value">___</div>` |
 | Info panel | `<h3>___</h3>` and the rows inside `#info` |
-| Model path | `loader.load('models/___')` ~line 188 |
+| Model path | `loader.load('models/___?v=' + Date.now())` ~line 192 |
 | Status text | `s.textContent = '___ detected'` in markerFound |
 
 ### GLTFLoader
