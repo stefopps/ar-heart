@@ -1,45 +1,78 @@
-# AR Heart — MeWorld
+# AR Viewer — MeWorld
 
-WebAR anatomical heart that appears when you point your phone camera at a Hiro marker.
+WebAR viewer that displays 3D models when you point your phone camera at a Hiro marker.
 Built with Three.js + ARToolkit, deployed via GitHub Pages.
 
-## Quick Launch (Desktop Flyer)
+**Current model:** Crimson Polygon Racer (Meshy AI, GLTF 2.0, 17.7MB GLB)
 
-Open the flyer in a browser — it shows the QR code and Hiro marker side by side.
-Display it on a second screen or print it, then scan the QR with your phone.
+## Quick Launch — Agent Checklist (Must Follow)
 
-```
-file:///C:/Users/steve/Augmented%20Reality/ar-heart/flyer.html
-```
+Every agent must do this in order. Skip nothing. The flyer always launches first.
 
-**Launch commands** (Cursor agent / PowerShell):
-
+1. **Open the flyer** (QR code + Hiro marker side by side):
 ```powershell
 Start-Process "file:///C:/Users/steve/Augmented%20Reality/ar-heart/flyer.html"
 ```
 
-To also open the AR experience on desktop:
-
-```powershell
-Start-Process "C:\Users\steve\Augmented Reality\ar-heart\index.html"
-```
-
-### Dev Server (for phone access)
-
-Start the local server on port 8443:
-
+2. **Start the dev server** on port 8443:
 ```powershell
 Set-Location "C:\Users\steve\Augmented Reality\ar-heart"
-python -c "import http.server; h=http.server.SimpleHTTPRequestHandler; h.extensions_map['.js']='application/javascript'; h.extensions_map['.dat']='application/octet-stream'; h.extensions_map['.patt']='application/octet-stream'; h.extensions_map['.wasm']='application/wasm'; s=http.server.HTTPServer(('0.0.0.0',8443),h); print('AR Heart on http://localhost:8443'); s.serve_forever()"
+python -c "import http.server; h=http.server.SimpleHTTPRequestHandler; h.extensions_map['.js']='application/javascript'; h.extensions_map['.dat']='application/octet-stream'; h.extensions_map['.patt']='application/octet-stream'; h.extensions_map['.wasm']='application/wasm'; s=http.server.HTTPServer(('0.0.0.0',8443),h); print('AR on http://localhost:8443'); s.serve_forever()"
+```
+
+3. **Open the AR viewer** in the browser:
+```powershell
+Start-Process "http://localhost:8443"
+```
+
+### Live URL (GitHub Pages)
+
+```
+https://stefopps.github.io/ar-heart
+```
+
+After any model change, you MUST push to `master` — Pages serves from `master` branch root. If the user says "it still shows the old model", you forgot to push.
+
+## How to Swap the 3D Model
+
+The model is loaded in `index.html` via GLTFLoader (~line 183). To swap:
+
+1. **Drop the new .glb file** into `models/`
+2. **Edit `index.html`** — change the `loader.load()` path and update the UI labels (title, badge, info panel)
+3. **Stage, commit, push:**
+```powershell
+Set-Location "C:\Users\steve\Augmented Reality\ar-heart"
+git add index.html README.md models/ js/
+git commit -m "swap model: <description>"
+git push origin master
+```
+4. **Verify** — open `https://stefopps.github.io/ar-heart` and confirm the new model renders. If it doesn't, you forgot to push.
+
+### Where to Edit in index.html
+
+| What | Line/Area |
+|------|-----------|
+| Page title | `<title>` in `<head>` |
+| Loading text | `<p>MeWorld AR ___</p>` in `#loading` div |
+| Top badge | `<div class="value">___</div>` |
+| Info panel | `<h3>___</h3>` and the rows inside `#info` |
+| Model path | `loader.load('models/___')` ~line 188 |
+| Status text | `s.textContent = '___ detected'` in markerFound |
+
+### GLTFLoader
+
+The project uses Three.js r86 (2017). The GLTFLoader compatible with r86 is at `js/GLTFLoader.js`. If you need to re-download:
+```powershell
+curl.exe -s -o "js\GLTFLoader.js" "https://cdn.jsdelivr.net/npm/three@0.86.0/examples/js/loaders/GLTFLoader.js"
 ```
 
 ## Quick Start (User)
 
-1. **Open the flyer** on your desktop (`flyer.html`) — QR code + Hiro marker side by side
+1. **Open the flyer** on desktop (`flyer.html`) — QR code + Hiro marker side by side
 2. **Scan the QR code** with your phone (or open `https://stefopps.github.io/ar-heart`)
 3. **Allow camera** access when prompted
 4. **Point your phone camera** at the Hiro marker on the flyer
-5. A 3D **beating anatomical heart** appears above the marker with a vitals panel (BPM, Rhythm, EF%)
+5. The 3D model appears above the marker — move the flyer to rotate/zoom
 
 ## How It Works
 
@@ -54,17 +87,13 @@ python -c "import http.server; h=http.server.SimpleHTTPRequestHandler; h.extensi
 | Hosting | GitHub Pages (static, no build step) |
 | Local dev | Python HTTP server on port 8443 |
 
-### 3D Heart (Procedural — No OBJ Files)
+### 3D Model
 
-The heart is built from Three.js geometric primitives:
+The current model is loaded from a GLB file via `THREE.GLTFLoader`. It replaces the original procedural anatomical heart.
 
-- **3 ellipsoids** (scaled spheres) for the main heart muscle — layered with color variation (`#cc2244` base)
-- **Aorta** — cylinder, red-tinted
-- **Pulmonary artery** — cylinder, blue-tinted
-- **SVC / IVC** — cylinders at top and bottom
-- **Lighting** — directional key + fill + ambient, all attached to the marker root
+**Model:** `models/Meshy_AI_Crimson_Polygon_Racer_0717124504_texture.glb` (17.7MB, GLTF 2.0)
 
-**Beating animation**: The heart pulses via `Math.sin(Date.now() * 0.008)` — uniform scale oscillation at ~76 BPM. Only active when the marker is tracked.
+The model is auto-scaled to fit a 0.8-unit bounding box and centered at Y=0.3 on the marker.
 
 ### Marker Tracking
 
@@ -75,23 +104,22 @@ Camera → ARToolkit pattern detection → 6DOF pose → Three.js scene transfor
 ```
 
 When the marker is detected:
-- The heart appears in 3D space, positioned relative to the marker
-- The info panel slides in (BPM, Rhythm, EF%)
-- The status bar shows "Heart detected"
-- BPM display starts (cosmetic, fluctuates 60–76)
+- The 3D model appears in space, positioned relative to the marker
+- The info panel slides in (model info)
+- The status bar shows "[Model] detected"
 
 When the marker is lost:
-- The heart disappears
+- The model disappears
 - The info panel slides out
 - Instructions reappear
 
 ### Controls
 
-The heart moves entirely through physical marker tracking:
+The model moves entirely through physical marker tracking:
 
-- **Move the flyer** → rotate/translate the heart
+- **Move the flyer** → rotate/translate
 - **Move closer** → zoom in (marker appears larger in camera)
-- **No on-screen controls, keyboard, or GUI are active** (though the libraries are loaded — see "Future Features" below)
+- **No on-screen controls, keyboard, or GUI are active**
 
 ## Deployment
 
@@ -145,7 +173,22 @@ The marker image (`hiro-marker.png`) is the standard ARToolkit Hiro pattern. The
 https://raw.githubusercontent.com/AR-js-org/AR.js/master/data/images/hiro.png
 ```
 
-## Recovery Notes (July 16, 2026)
+## Recovery Notes
+
+### July 17, 2026 — Model Swap
+
+Replaced the procedural anatomical heart with the Crimson Polygon Racer GLB:
+
+1. Downloaded `GLTFLoader.js` compatible with Three.js r86 from jsDelivr CDN
+2. Copied the racer GLB (17.7MB) into `models/`
+3. Stripped out `createHeart()`, `startBPM()`, and the beating animation from `index.html`
+4. Added GLB loading with auto-scale via `THREE.Box3().setFromObject()`
+5. Updated all UI labels (title, badge, info panel, status text)
+6. Pushed to `master` — GitHub Pages deploys automatically
+
+**Lesson:** Local `index.html` file changes don't matter for the phone — the phone scans the GitHub Pages URL. Always push after changes.
+
+### July 16, 2026 — Recovery After Reset
 
 The project was originally built on July 6, 2026. On July 16, after a laptop reset, it was re-cloned and the following issues were fixed:
 
@@ -159,16 +202,12 @@ The project was originally built on July 6, 2026. On July 16, after a laptop res
 
 ### Info Panel (right side, slides in)
 
-| Field | Display |
-|-------|---------|
-| BPM | 68–76 (sinusoidal fluctuation, cosmetic) |
-| Rhythm | Sinus |
-| EF | 60% |
+Displays current model metadata. Edit these values in `index.html` when changing models.
 
 ### Status Bar (bottom center)
 
-- "Point camera at the Hiro marker on your printed flyer" (tracking)
-- "Heart detected — tracking" with green pulse animation (found)
+- "Point camera at the Hiro marker on your flyer" (tracking)
+- "[Model] detected — tracking" with green pulse animation (found)
 
 ### Marker Overlay (first load)
 
@@ -177,15 +216,14 @@ Shows the Hiro marker image with a "Got it" dismiss button. Dark semi-transparen
 ## Active Features
 
 - [x] Hiro pattern marker tracking (ARToolkit)
-- [x] Procedural 3D anatomical heart (7 geometric parts)
-- [x] Beating animation (sine-wave pulsing, ~76 BPM)
-- [x] BPM display (cosmetic, 60–76 range)
-- [x] Info panel (BPM, Rhythm, EF%)
+- [x] GLTF 2.0 model loading via GLTFLoader (Three.js r86)
+- [x] Auto-scale model to fit bounding box
+- [x] Info panel
 - [x] Status bar with tracking state
 - [x] Loading screen
 - [x] Printable flyer with QR code + marker
 - [x] GitHub Pages deployment
-- [x] HTTPS local dev server
+- [x] Local dev server on port 8443
 
 ## Libraries Present But Not Wired
 
