@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- deploy:2026-07-17 14:18 UTC • v=3 • cache-buster deployed -->
+<!-- deploy:2026-07-17 14:28 UTC • v=4 • orange-theme • cache-buster deployed -->
 <html>
 <head>
 <meta charset="utf-8">
@@ -26,14 +26,14 @@
 
   .status-bar {
     position:fixed; bottom:100px; left:50%; transform:translateX(-50%);
-    background:rgba(10,10,20,0.9); border:1px solid rgba(0,229,160,0.3);
-    border-radius:20px; padding:10px 24px; color:#00e5a0; font-size:14px;
+    background:rgba(10,10,20,0.9); border:1px solid rgba(255,102,0,0.3);
+    border-radius:20px; padding:10px 24px; color:#ff6600; font-size:14px;
     transition:all 0.4s; opacity:0;
   }
   .status-bar.visible { opacity:1; }
   @keyframes pulse {
-    0%,100% { border-color:rgba(0,229,160,0.3); }
-    50% { border-color:rgba(0,229,160,0.8); }
+    0%,100% { border-color:rgba(255,102,0,0.3); }
+    50% { border-color:rgba(255,102,0,0.8); }
   }
   .status-bar.found { animation:pulse 1.5s infinite; }
 
@@ -46,7 +46,7 @@
     opacity:0; transform:translateY(-50%) translateX(20px);
   }
   .info-panel.visible { opacity:1; transform:translateY(-50%) translateX(0); }
-  .info-panel h3 { color:#00e5a0; font-size:14px; margin:0 0 8px 0; }
+  .info-panel h3 { color:#ff6600; font-size:14px; margin:0 0 8px 0; }
   .info-panel .row { display:flex; justify-content:space-between; padding:3px 0; border-bottom:1px solid rgba(255,255,255,0.06); }
   .info-panel .key { color:#888; }
   .info-panel .note { color:#666; font-size:9px; margin-top:8px; }
@@ -54,7 +54,7 @@
 .marker-overlay { position:fixed; inset:0; z-index:100; background:rgba(0,0,0,0.85); display:flex; align-items:center; justify-content:center; }
   .marker-overlay.hidden { display:none; }
   .marker-card { text-align:center; color:#e0e0e0; }
-  .marker-card h3 { color:#00e5a0; font-size:18px; margin-bottom:16px; }
+  .marker-card h3 { color:#ff6600; font-size:18px; margin-bottom:16px; }
   .instructions {
     position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
     color:#888; font-size:12px; text-align:center; transition:opacity 0.5s;
@@ -69,7 +69,7 @@
   #loading.gone { opacity:0; pointer-events:none; }
   #loading .spinner {
     width:36px; height:36px; border:3px solid rgba(255,255,255,0.1);
-    border-top-color:#00e5a0; border-radius:50%; margin:16px 0;
+    border-top-color:#ff6600; border-radius:50%; margin:16px 0;
     animation:spin 0.8s linear infinite;
   }
   @keyframes spin { to { transform:rotate(360deg); } }
@@ -103,9 +103,9 @@
 <div class="marker-overlay" id="markerOverlay">
   <div class="marker-card">
     <h3>Point camera at this marker</h3>
-    <img src="hiro_marker.png" alt="Hiro Marker" style="width:200px;height:200px;border:2px solid #333;border-radius:8px">
+    <img src="hiro_marker.png" alt="Hiro Marker" style="width:200px;height:200px;border:3px solid #ff6600;border-radius:8px;filter:sepia(100%) saturate(400%) hue-rotate(340deg) brightness(1.1)">
     <p style="color:#888;font-size:11px;margin-top:8px">Display on another screen or print</p>
-    <button onclick="document.getElementById('markerOverlay').classList.add('hidden')" style="margin-top:12px;padding:10px 30px;background:#00e5a0;color:#000;border:none;border-radius:8px;font-weight:600;font-size:14px">Got it</button>
+    <button onclick="document.getElementById('markerOverlay').classList.add('hidden')" style="margin-top:12px;padding:10px 30px;background:#ff6600;color:#000;border:none;border-radius:8px;font-weight:600;font-size:14px">Got it</button>
   </div>
 </div>
 
