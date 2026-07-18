@@ -51,10 +51,17 @@
   .info-panel .key { color:#888; }
   .info-panel .note { color:#666; font-size:9px; margin-top:8px; }
 
-  .marker-overlay { position:fixed; inset:0; z-index:100; background:rgba(0,0,0,0.85); display:flex; align-items:center; justify-content:center; }
+  .marker-overlay {
+    position:fixed; top:0; left:0; right:0; z-index:100;
+    background:rgba(10,10,20,0.92); border-bottom:1px solid rgba(255,102,0,0.3);
+    padding:12px 16px; display:flex; align-items:center; gap:14px;
+    max-height:80px; overflow:hidden;
+  }
   .marker-overlay.hidden { display:none; }
-  .marker-card { text-align:center; color:#e0e0e0; }
-  .marker-card h3 { color:#ff6600; font-size:18px; margin-bottom:16px; }
+  .marker-card { display:flex; align-items:center; gap:14px; color:#e0e0e0; width:100%; }
+  .marker-card h3 { color:#ff6600; font-size:14px; margin:0; white-space:nowrap; }
+  .marker-card p { color:#666; font-size:10px; margin:4px 0 0 0; white-space:nowrap; }
+  .marker-card .text-block { flex:1; min-width:0; }
   .instructions {
     position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
     color:#888; font-size:12px; text-align:center; transition:opacity 0.5s;
@@ -112,17 +119,18 @@
 
 <div class="marker-overlay" id="markerOverlay">
   <div class="marker-card">
-    <h3>Point camera at this marker</h3>
-    <img src="hiro_marker.png" alt="Hiro Marker" style="width:200px;height:200px;border:3px solid #ff6600;border-radius:8px;filter:sepia(100%) saturate(400%) hue-rotate(340deg) brightness(1.1)">
-    <p style="color:#888;font-size:11px;margin-top:8px">Display on another screen or print</p>
-    <button onclick="document.getElementById('markerOverlay').classList.add('hidden')" style="margin-top:12px;padding:10px 30px;background:#ff6600;color:#000;border:none;border-radius:8px;font-weight:600;font-size:14px">Got it</button>
+    <img src="hiro_marker.png" alt="Hiro Marker" style="width:52px;height:52px;border:2px solid #ff6600;border-radius:6px;">
+    <div class="text-block">
+      <h3>Point camera at this marker</h3>
+      <p>Show on another screen or print your flyer</p>
+    </div>
   </div>
 </div>
 
 <div class="instructions" id="instr">Point camera at the &#x2B1B; <b>Hiro marker</b> &#x2B1B; on your printed flyer</div>
 <div class="touch-hint" id="touchHint">&#x270B; Swipe to rotate &nbsp; &#x1F44C; Pinch to zoom</div>
 
-<!-- v=9 interactive AR: r98 three.js + touch rotation + pinch zoom + smoothed tracking + better lighting -->
+<!-- v=10: Stemkoski hierarchy fix — smoothRoot as scene sibling + smoothControls.update each frame -->
 <script src="js/three.js"></script>
 <script src="js/GLTFLoader.js"></script>
 <script src="jsartoolkit5/artoolkit.min.js"></script>
@@ -207,6 +215,13 @@ function initialize() {
     onResize();
     document.getElementById('loading').classList.add('gone');
     document.getElementById('status').classList.add('visible');
+    // Auto-hide marker banner after 6s so camera is fully visible
+    setTimeout(function() {
+      var overlay = document.getElementById('markerOverlay');
+      overlay.style.transition = 'opacity 0.5s';
+      overlay.style.opacity = '0';
+      setTimeout(function() { overlay.classList.add('hidden'); }, 500);
+    }, 6000);
   }, function onSourceError() {
     setLoadMsg('Camera failed to start. Check camera permissions and reload.', true);
   });
@@ -222,11 +237,11 @@ function initialize() {
     camera.projectionMatrix.copy(arToolkitContext.getProjectionMatrix());
   });
 
-  // === Scene hierarchy ===
-  // markerRoot → ArMarkerControls (tracks physical marker position)
-  //   smoothRoot → ArSmoothedControls (smooths out jitter)
-  //     touchOrbit → user touch rotation + pinch scale
-  //       modelGroup → loaded GLB model
+  // === Scene hierarchy (canonical AR.js pattern) ===
+  // markerRoot   → scene sibling → ArMarkerControls sets its position from tracking
+  // smoothRoot   → scene sibling → ArSmoothedControls lerps it toward markerRoot
+  //   touchOrbit → child of smoothRoot → user touch rotation + pinch scale
+  //     modelGroup → child of touchOrbit → loaded GLB model
 
   markerRoot = new THREE.Group();
   scene.add(markerRoot);
@@ -235,7 +250,7 @@ function initialize() {
   });
 
   smoothRoot = new THREE.Group();
-  markerRoot.add(smoothRoot);
+  scene.add(smoothRoot);
   smoothControls = new THREEx.ArSmoothedControls(smoothRoot, {
     lerpPosition: 0.8,
     lerpQuaternion: 0.2,
@@ -411,6 +426,12 @@ function setLoadMsg(msg, isError) {
 function update() {
   if (arToolkitSource.ready !== false) {
     arToolkitContext.update(arToolkitSource.domElement);
+  }
+
+  // CRITICAL: ArSmoothedControls must be manually updated each frame
+  // with the markerRoot so it lerps smoothRoot toward the physical marker position
+  if (smoothControls) {
+    smoothControls.update(markerRoot);
   }
 
   // Smooth lerp rotation toward target (both touch and auto-rotate feed into this)
