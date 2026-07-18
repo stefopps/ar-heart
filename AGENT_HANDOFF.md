@@ -118,7 +118,7 @@ git push origin master
 
 ## Home URLs
 
-- **Local dev:** `https://localhost:8443` (with server running)
+- **Local dev:** `http://localhost:8443/preview.html` (with server running)
 - **GitHub Pages:** `https://stefopps.github.io/ar-heart?v=7` (current)
 - **Repo:** `https://github.com/stefopps/ar-heart`
 - **Flyer:** `file:///C:/Users/steve/Augmented%20Reality/ar-heart/flyer.html`

@@ -172,6 +172,8 @@ function loadModel() {
       var msg = 'Failed to load model.';
       if (err && err.target && err.target.status) {
         msg += ' HTTP ' + err.target.status + ' — check that "' + MODEL_URL + '" exists at that exact path.';
+      } else if (location.protocol === 'file:') {
+        msg += ' You opened this file directly (file://). Browsers block local file loads for security. Use the dev server: http://localhost:8443/preview.html';
       } else {
         msg += ' Check the browser console (F12) for details — likely a wrong file path or a CORS/mime-type issue from your local server.';
       }
