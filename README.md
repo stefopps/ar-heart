@@ -1,136 +1,117 @@
 # AR Viewer — MeWorld
 
 WebAR viewer that displays 3D models when you point your phone camera at a Hiro marker.
-Built with Three.js + ARToolkit, deployed via GitHub Pages.
+Built with Three.js r98 + ARToolkit, deployed via GitHub Pages.
 
-**Current model:** Crimson Polygon Racer (Meshy AI, GLTF 2.0, 17.7MB GLB)
+**Current model:** Crimson Polygon Racer (Meshy AI, glTF 2.0 PBR, 17.7MB GLB)
 
 ## Quick Launch — Agent Checklist (Must Follow)
 
 Every agent must do this in order. Skip nothing. The flyer always launches first.
 
-1. **Open the flyer** (QR code + Hiro marker side by side):
+1. **Start the dev server** on port 8443:
+```powershell
+cd "C:\Users\steve\Augmented Reality\ar-heart"
+python -m http.server 8443
+```
+
+2. **Open the flyer** (QR code + Hiro marker side by side):
 ```powershell
 Start-Process "file:///C:/Users/steve/Augmented%20Reality/ar-heart/flyer.html"
 ```
 
-2. **Start the dev server** on port 8443:
+3. **Open the preview viewer** in the browser:
 ```powershell
-Set-Location "C:\Users\steve\Augmented Reality\ar-heart"
-python -c "import http.server; h=http.server.SimpleHTTPRequestHandler; h.extensions_map['.js']='application/javascript'; h.extensions_map['.dat']='application/octet-stream'; h.extensions_map['.patt']='application/octet-stream'; h.extensions_map['.wasm']='application/wasm'; s=http.server.HTTPServer(('0.0.0.0',8443),h); print('AR on http://localhost:8443'); s.serve_forever()"
+Start-Process "http://localhost:8443/preview.html"
 ```
 
-3. **Open the AR viewer** in the browser:
-```powershell
-Start-Process "http://localhost:8443"
-```
+Do NOT double-click `preview.html` — the `file://` protocol blocks local asset loading.
 
 ### Live URL (GitHub Pages)
-
 ```
-https://stefopps.github.io/ar-heart
+https://stefopps.github.io/ar-heart?v=8
 ```
+After any change, push to `master` and wait 5 minutes for Fastly CDN to propagate.
 
-After any model change, you MUST push to `master` — Pages serves from `master` branch root. If the user says "it still shows the old model", you forgot to push.
-
-## How to Swap the 3D Model
-
-The model is loaded in `index.html` via GLTFLoader (~line 183). To swap:
+## Model Swap Pipeline
 
 1. **Drop the new .glb file** into `models/`
-2. **Edit `index.html`** — change the `loader.load()` path and update the UI labels (title, badge, info panel)
-3. **Stage, commit, push:**
+2. **Edit `index.html`** and `preview.html` — change `MODEL_URL` and UI labels
+3. **Regenerate QR** with new version number:
 ```powershell
-Set-Location "C:\Users\steve\Augmented Reality\ar-heart"
-# Bump the cache version on every deploy (prevents stale CDN/phone cache)
-python -q -c "import qrcode; qr = qrcode.QRCode(box_size=10, border=4); qr.add_data('https://stefopps.github.io/ar-heart?v=N'); qr.make(fit=True); img = qr.make_image(fill_color='black', back_color='white'); img.save('qr-iphone.png'); print('QR regenerated')"
-git add index.html README.md models/ js/ qr-iphone.png flyer.html
-git commit -m "swap model: <description>, v=N cache-bust"
+python -c "import qrcode; qr = qrcode.QRCode(box_size=10, border=4); qr.add_data('https://stefopps.github.io/ar-heart/?v=N'); qr.make(fit=True); img = qr.make_image(fill_color='#ff6600', back_color='#0a0a0f'); img.save('qr-iphone.png')"
+```
+4. **Commit and push:**
+```powershell
+git add index.html preview.html qr-iphone.png models/
+git commit -m "swap model: <name>, v=N cache-bust"
 git push origin master
 ```
-4. **Wait 5 minutes** — GitHub Pages CDN (Fastly) has a `max-age=300` TTL. Testing immediately will serve stale.
-5. **Verify** — open `https://stefopps.github.io/ar-heart?v=N` with the new version number. If the UI doesn't match, check the deploy comment at the top of the page source.
+5. **Wait 5 minutes** for CDN purge
+6. **Test** in private tab: `https://stefopps.github.io/ar-heart?v=N`
 
-### Where to Edit in index.html
+### Where to Edit
 
-| What | Line/Area |
-|------|-----------|
-| **Deploy stamp** | `<!-- deploy:... -->` comment at line 2 — update timestamp on every push |
-| Page title | `<title>` in `<head>` |
-| Loading text | `<p>MeWorld AR ___</p>` in `#loading` div |
-| Top badge | `<div class="value">___</div>` |
-| Info panel | `<h3>___</h3>` and the rows inside `#info` |
-| Model path | `loader.load('models/___?v=' + Date.now())` ~line 192 |
-| Status text | `s.textContent = '___ detected'` in markerFound |
+| What | File | Variable/Location |
+|------|------|-------------------|
+| Model path | `index.html`, `preview.html` | `var MODEL_URL = 'models/___'` |
+| Page title | `index.html` | `<title>` in `<head>` |
+| Loading text | `index.html` | `<p>` in `#loading` div |
+| Top badges | `index.html` | `<div class="value">` |
+| Info panel | `index.html` | `<h3>` and rows in `#info` |
+| Status text | `index.html` | `s.textContent` in markerFound |
 
-### GLTFLoader
+## Tech Stack
 
-The project uses Three.js r86 (2017). The GLTFLoader compatible with glTF 2.0 is at `js/GLTFLoader.js` (Don McCurdy rewrite, three.js r94 era). If you need to re-download:
-```powershell
-# WARNING: three.js r86 CDN ships a glTF 1.0 loader (technique/shader-based).
-# For glTF 2.0 GLB files (pbrMetallicRoughness, what Meshy AI exports), use:
-curl.exe -s -o "js\GLTFLoader.js" "https://cdn.jsdelivr.net/npm/three@0.94.0/examples/js/loaders/GLTFLoader.js"
-```
-DO NOT use the r86 CDN loader — it silently fails on glTF 2.0 files.
+| Layer | Version |
+|-------|---------|
+| **Three.js** | r98 (jsDelivr CDN) |
+| **GLTFLoader** | r98 matched — glTF 2.0 PBR (`pbrMetallicRoughness`) |
+| **OrbitControls** | r98 matched — preview viewer |
+| **AR Tracking** | `jsartoolkit5` + `threex` (stemkoski, version-locked, untouched) |
+| **Marker** | Hiro pattern (`data/hiro.patt`) |
+| **Hosting** | GitHub Pages (static, no build step) |
+| **Local dev** | Python `http.server` on port 8443 |
 
-## Quick Start (User)
+### Why r98?
 
-1. **Open the flyer** on desktop (`flyer.html`) — QR code + Hiro marker side by side
-2. **Scan the QR code** with your phone (or open `https://stefopps.github.io/ar-heart`)
-3. **Allow camera** access when prompted
-4. **Point your phone camera** at the Hiro marker on the flyer
-5. The 3D model appears above the marker — move the flyer to rotate/zoom
+- **r86** only shipped a glTF **1.0** loader — silently fails on glTF 2.0 files (infinite spinner, no errors)
+- **r94** has a glTF 2.0 loader but the built file doesn't export `LoaderUtils`/`AnimationUtils` — GLTFLoader crashes
+- **r98** is the first release where three.js exports all utilities its own GLTFLoader needs — zero polyfills
+
+### Backups
+
+- `js/three.js.r86.bak` — original r86 core. Restore ONLY if AR.js marker tracking breaks after an upgrade.
+- `js/GLTFLoader.js.old.bak` — previous loader (r94 era, needs polyfills).
+
+## Defensive Loading
+
+Both `index.html` and `preview.html` have hardened model loading:
+- **45s timeout** — no more infinite spinners
+- **`try/catch`** around `loader.load()` — catches sync exceptions
+- **Empty geometry check** — zero bounding box → "empty model" error
+- **HTTP status** in error messages
+- **`file://` detection** — tells user to use the dev server
+- **Reload button** in preview.html
 
 ## How It Works
 
-### Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| AR Tracking | ARToolkit (WebAssembly) via `jsartoolkit5` |
-| 3D Rendering | Three.js |
-| Marker | Hiro pattern (standard AR marker, `data/hiro.patt`) |
-| Camera | WebRTC `getUserMedia` via `THREEx.ArToolkitSource` |
-| Hosting | GitHub Pages (static, no build step) |
-| Local dev | Python HTTP server on port 8443 |
-
-### 3D Model
-
-The current model is loaded from a GLB file via `THREE.GLTFLoader`. It replaces the original procedural anatomical heart.
-
-**Model:** `models/Meshy_AI_Crimson_Polygon_Racer_0717124504_texture.glb` (17.7MB, GLTF 2.0)
-
-The model is auto-scaled to fit a 0.8-unit bounding box and centered at Y=0.3 on the marker.
+### Model Loading
+The GLB is loaded via `THREE.GLTFLoader`, auto-scaled to fit a 0.8-unit bounding box, centered at Y=0.3 on the marker.
 
 ### Marker Tracking
-
-The Hiro marker is tracked using ARToolkit's pattern matching:
-
 ```
 Camera → ARToolkit pattern detection → 6DOF pose → Three.js scene transform
 ```
+Phone-only (needs WebRTC `getUserMedia`). Desktop `preview.html` is for model inspection only.
 
-When the marker is detected:
-- The 3D model appears in space, positioned relative to the marker
-- The info panel slides in (model info)
-- The status bar shows "[Model] detected"
+### Controls (preview.html)
+- **Drag** → orbit (rotateSpeed: 0.3)
+- **Scroll** → zoom (zoomSpeed: 0.8)
+- **Right-drag** → pan
+- Damping: 0.15 (smooth inertia)
 
-When the marker is lost:
-- The model disappears
-- The info panel slides out
-- Instructions reappear
-
-### Controls
-
-The model moves entirely through physical marker tracking:
-
-- **Move the flyer** → rotate/translate
-- **Move closer** → zoom in (marker appears larger in camera)
-- **No on-screen controls, keyboard, or GUI are active**
-
-## Deployment
-
-### GitHub Pages (Production)
+## Deploy (GitHub Pages)
 
 ```
 Repo:   github.com/stefopps/ar-heart
@@ -138,133 +119,8 @@ Branch: master (root)
 URL:    https://stefopps.github.io/ar-heart
 ```
 
-GitHub Pages is configured in the repo settings. Every push to `master` automatically deploys.
-
-### Local Development
-
-Run a Python HTTP server (needed because HTTPS is required for camera access on iOS):
-
-```bash
-python server.py  # serves on port 8443 with SSL certs for camera permissions
-```
-
-Or with the standard library:
-
-```bash
-python -c "import http.server; h=http.server.SimpleHTTPRequestHandler; h.extensions_map['.js']='application/javascript'; h.extensions_map['.dat']='application/octet-stream'; s=http.server.HTTPServer(('0.0.0.0',8443),h); print(':8443'); s.serve_forever()"
-```
-
-If testing from a phone on the same Wi-Fi, open **Windows Firewall** for port 8443 (admin CMD):
-
-```
-netsh advfirewall firewall add rule name="AR_Heart_8443" dir=in action=allow protocol=TCP localport=8443
-```
-
-### QR Code Generation
-
-The QR code (`qr-iphone.png`) points to the GitHub Pages URL. To regenerate:
-
-```python
-import qrcode
-qr = qrcode.QRCode(box_size=10, border=4)
-qr.add_data("https://stefopps.github.io/ar-heart")
-qr.make(fit=True)
-qr.make_image(fill_color="black", back_color="white").save("qr-iphone.png")
-```
-
-### Hiro Marker
-
-The marker image (`hiro-marker.png`) is the standard ARToolkit Hiro pattern. The pattern data is in `data/hiro.patt`. To download from CDN:
-
-```
-https://raw.githubusercontent.com/AR-js-org/AR.js/master/data/images/hiro.png
-```
-
-## Recovery Notes
-
-### July 17, 2026 — Model Swap
-
-Replaced the procedural anatomical heart with the Crimson Polygon Racer GLB:
-
-1. Downloaded `GLTFLoader.js` compatible with Three.js r86 from jsDelivr CDN
-2. Copied the racer GLB (17.7MB) into `models/`
-3. Stripped out `createHeart()`, `startBPM()`, and the beating animation from `index.html`
-4. Added GLB loading with auto-scale via `THREE.Box3().setFromObject()`
-5. Updated all UI labels (title, badge, info panel, status text)
-6. Pushed to `master` — GitHub Pages deploys automatically
-
-**Lesson:** Local `index.html` file changes don't matter for the phone — the phone scans the GitHub Pages URL. Always push after changes.
-
-### July 16, 2026 — Recovery After Reset
-
-The project was originally built on July 6, 2026. On July 16, after a laptop reset, it was re-cloned and the following issues were fixed:
-
-1. **Missing assets** — `hiro-marker.png` and `qr-iphone.png` were not in the repo (cleaned in an earlier commit). Re-generated both.
-2. **QR code URL** — Originally pointed to a local IP (`192.168.1.157:8443`). Updated to GitHub Pages URL so it works from any phone without firewall configuration.
-3. **GitHub Pages confirmation** — Verified Pages is enabled deploying from `master` branch root.
-4. **Marker overlay** — Added an overlay to `index.html` showing the Hiro marker on first load so users know what to point at.
-5. **Firewall rule** — Added Windows Firewall exception for port 8443 for local dev testing.
-
-## UI Panels
-
-### Info Panel (right side, slides in)
-
-Displays current model metadata. Edit these values in `index.html` when changing models.
-
-### Status Bar (bottom center)
-
-- "Point camera at the Hiro marker on your flyer" (tracking)
-- "[Model] detected — tracking" with green pulse animation (found)
-
-### Marker Overlay (first load)
-
-Shows the Hiro marker image with a "Got it" dismiss button. Dark semi-transparent overlay.
-
-## Active Features
-
-- [x] Hiro pattern marker tracking (ARToolkit)
-- [x] GLTF 2.0 model loading via GLTFLoader (Three.js r86)
-- [x] Auto-scale model to fit bounding box
-- [x] Info panel
-- [x] Status bar with tracking state
-- [x] Loading screen
-- [x] Printable flyer with QR code + marker
-- [x] GitHub Pages deployment
-- [x] Local dev server on port 8443
-
-## Libraries Present But Not Wired
-
-These files are in the repo and loaded in `index.html` but not activated:
-
-| File | What It Does | 
-|------|-------------|
-| `js/keyboard.js` | Keyboard input handling |
-| `js/dat.gui.min.js` | GUI control panel (sliders, color pickers) |
-| `js/OBJLoader.js` + `js/MTLLoader.js` | Load external 3D model files |
-| `js/stats.min.js` | FPS performance monitor |
-| `threex/threex-arsmoothedcontrols.js` | Smoothed marker tracking (lerp/slerp) |
-
-### Future Feature Ideas
-
-- **dat.GUI panel** — sliders for BPM speed, heart scale, color, opacity
-- **OBJ model loading** — swap the procedural heart for a detailed anatomical OBJ
-- **Smooth tracking** — instantiate `ArSmoothedControls` to reduce jitter
-- **Keyboard controls** — arrow keys to rotate, +/- to zoom
-- **Multiple markers** — different views (cross-section, external, labeled)
-- **Touch/drag gestures** — rotate with one finger, pinch to zoom
-- **Audio** — heartbeat sound synchronized to animation
-
-## Git History
-
-```
-50e0543  flyer assets: Hiro marker + QR code pointing to GitHub Pages  (Jul 16, 2026)
-f2af3de  Update QR and flyer for Pages URL                            (Jul 6, 2026)
-c2448c2  Clean: remove dev artifacts                                  (Jul 6, 2026)
-9bffd5c  AR heart demo -- stemkoski pattern                           (Jul 6, 2026)
-```
-
 ## Credits
 
-- **Code base**: [stemkoski/AR-Examples](https://github.com/stemkoski/AR-Examples) (Lee Stemkoski)
+- **Code base**: [stemkoski/AR-Examples](https://github.com/stemkoski/AR-Examples)
 - **Inspiration**: [@thesunkenblimp](https://www.instagram.com/p/DZ5zg9cRSk6)
 - **MeWorld AR** by Steve (`stefopps`)

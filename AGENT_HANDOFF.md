@@ -2,7 +2,7 @@
 
 **Last agent:** Cursor (claude-sonnet-4)
 **Date:** 2026-07-18 ~08:30 UTC
-**Status:** DEPLOYED — v=7 r94 production upgrade live on GitHub Pages
+**Status:** DEPLOYED — v=8 r98 production stack live on GitHub Pages
 
 ---
 
@@ -12,54 +12,42 @@ READ the Quick Launch checklist in `README.md`. The flyer launches FIRST. The de
 
 ---
 
-## What We Built / Fixed This Session
+## What's Live Right Now
 
-### 1. Root Cause: Silent Infinite Spinner (FIXED — v=5)
+### Stack (v=8, working)
+| Component | Version | Source |
+|-----------|---------|--------|
+| `js/three.js` | **r98** | jsDelivr CDN (`three@0.98.0/build/three.js`) |
+| `js/GLTFLoader.js` | **r98** (matched) | jsDelivr CDN (`three@0.98.0/examples/js/loaders/GLTFLoader.js`) |
+| `js/OrbitControls.js` | **r98** (matched) | jsDelivr CDN (`three@0.98.0/examples/js/controls/OrbitControls.js`) |
+| Model | Crimson Polygon Racer | Meshy AI, 17.7MB GLB, glTF 2.0 PBR |
+| AR tracking | `jsartoolkit5` + `threex` | Original stemkoski stack (untouched) |
 
-**The problem:** The original `GLTFLoader.js` was a **glTF 1.0** loader (uses `technique`/`program`/`shader` materials, `KHR_materials_common`, binary header `version: 1`). Meshy AI and Houdini export **glTF 2.0** GLB files (PBR `pbrMetallicRoughness` materials). The 1.0 loader silently failed inside internal Promises with no `.catch` — no error ever surfaced, spinner spun forever, zero console output.
+### Why r98?
+The r86 core only shipped with a glTF 1.0 loader. r94 added glTF 2.0 but didn't export `LoaderUtils`/`AnimationUtils` in the built file — the GLTFLoader crashed with "Cannot read properties of undefined (reading 'extractUrlBase')". **r98** is the first version where the built three.js exports all utilities its own GLTFLoader needs, with zero polyfills.
 
-**The fix (v=5):** Replaced `js/GLTFLoader.js` with the three.js r94 glTF-2.0-capable rewrite (Don McCurdy).
+### The Journey
+```
+r86 → silent infinite spinner (glTF 1.0 loader can't parse 2.0 GLBs)
+  ↓
+r94 → missing LoaderUtils/AnimationUtils/BufferGeometryUtils (loaded but no polyfill = crash)
+  ↓
+r98 → works out of the box. matched trio. no hacks.
+```
 
-### 2. Production Upgrade (v=7 — THIS SESSION)
+### Defensive Loading (in both index.html + preview.html)
+- **45s hard timeout** — if `onLoad` never fires, user sees "Timed out" instead of infinite spinner
+- **Sync `try/catch`** around `loader.load()` — catches exceptions the internal Promise chain drops
+- **Empty geometry check** — zero bounding box → "empty model" error
+- **HTTP status** in error messages when available
+- **`file://` detection** — tells user to use `http://localhost:8443/preview.html` instead of double-clicking
+- **Reload button** in preview.html when load fails
 
-**Three.js core upgraded from r86 → r94:**
-- `js/three.js` — REVISION '94', matched trio with GLTFLoader and OrbitControls
-- `js/GLTFLoader.js` — glTF 2.0 PBR (`pbrMetallicRoughness`, `KHR_materials_pbrSpecularGlossiness`)
-- `js/OrbitControls.js` — matched r94, for preview.html
-
-**Defensive loading pattern — no more silent failures:**
-- 20s hard timeout on every `loader.load()` call
-- Sync `try/catch` around `loader.load()` — catches things the Promise chain drops
-- Empty geometry check (zero bounding box detection)
-- HTTP status in error messages when available
-- Reload button when loading fails
-
-**Backup files left in `js/`:**
-- `three.js.r86.bak` — original r86 core, restore if AR.js marker tracking breaks
-- `GLTFLoader.js.old.bak` — previous loader (likely also glTF 2.0 but from earlier fix)
-
-### 3. Model Swap: Crimson Racer → Retopology (v=6)
-- Model at `models/retopology.glb` (320KB, converted from Houdini OBJ)
-- All UI labels updated: "Retopology", "Houdini 22", "OBJ → GLB"
-- The old 17.7MB Meshy model is still in models/ if needed
-
-### 4. Cache-Busting Pipeline
-**The problem:** GitHub Pages CDN (Fastly) serves `max-age=300`. iOS Safari caches aggressively. Every push takes up to 5 min to propagate. The phone won't show changes immediately.
-**The fix:** Three layers:
-1. **GLB loader** — `loader.load('...glb?v=' + Date.now())` — fresh URL every page load
-2. **QR code** — regenerates with `?v=N` query param on every deploy
-3. **Deploy stamp** — `<!-- v=N -->` comment in `index.html` for version verification
-
-**When swapping models, ALWAYS:**
-- Bump the `v=` number
-- Regenerate `qr-iphone.png` with the new URL
-- Wait 5 min before testing on phone
-- Test in a private/incognito tab first
-
-### 5. Orange Theme
-- All UI elements use `#ff6600` orange (borders, text, buttons, spinner, accent glows)
-- Hiro marker tinted orange via CSS filter
-- If you see green, you're looking at a cached old version
+### Controls (preview.html)
+- `rotateSpeed: 0.3` (was 1.0 — 70% slower, no more twitch)
+- `zoomSpeed: 0.8` (was 1.0)
+- `dampingFactor: 0.15` (was 0.08 — more inertia)
+- `minDistance: 0.5`, `maxDistance: 15`
 
 ---
 
@@ -67,21 +55,38 @@ READ the Quick Launch checklist in `README.md`. The flyer launches FIRST. The de
 
 | File | Purpose |
 |------|---------|
-| `index.html` | AR viewer (phone scans QR, points at marker, 3D model appears) — hardened with 20s timeout |
+| `index.html` | AR viewer — hardened with 45s timeout, try/catch, empty-geometry check |
 | `flyer.html` | Desktop/print: QR code + Hiro marker side by side |
-| `preview.html` | 3D viewer (no AR, no camera): orbit/zoom/pan the model — hardened with timeout + reload button |
-| `models/retopology.glb` | Current model (320KB, Houdini OBJ → GLB) |
-| `models/Meshy_AI_Crimson_Polygon_Racer_0717124504_texture.glb` | Old model (17.7MB, Meshy AI) |
-| `js/three.js` | Three.js r94 — DO NOT DOWNGRADE without understanding glTF loader impact |
-| `js/GLTFLoader.js` | Three.js r94 glTF 2.0 loader (pbrMetallicRoughness) |
-| `js/OrbitControls.js` | Three.js r94 orbit controls |
-| `js/three.js.r86.bak` | Original r86 backup — restore only if AR.js marker tracking breaks |
-| `js/GLTFLoader.js.old.bak` | Previous loader backup |
+| `preview.html` | 3D viewer — orbit controls, hardened loader, reload button, `file://` warning |
+| `models/Meshy_AI_Crimson_Polygon_Racer_0717124504_texture.glb` | Current model (17.7MB, Meshy AI PBR) |
+| `models/retopology.glb` | Test model (331KB, Houdini OBJ → GLB) |
+| `js/three.js` | Three.js r98 — DO NOT DOWNGRADE |
+| `js/GLTFLoader.js` | r98 glTF 2.0 loader (`pbrMetallicRoughness`) |
+| `js/OrbitControls.js` | r98 orbit controls |
+| `js/three.js.r86.bak` | Original r86 — restore only if AR.js tracking breaks |
+| `js/GLTFLoader.js.old.bak` | Previous loader (r94 era, needs polyfills) |
 | `data/hiro.patt` | ARToolkit Hiro marker pattern |
 | `data/camera_para.dat` | ARToolkit camera parameters |
-| `qr-iphone.png` | QR code pointing to Pages URL with v=7 param |
-| `AGENT_HANDOFF.md` | This file — read me first |
+| `qr-iphone.png` | QR code → `https://stefopps.github.io/ar-heart/?v=8` |
+| `AGENT_HANDOFF.md` | This file |
 | `README.md` | Quick launch checklist |
+
+---
+
+## Cache-Busting Pipeline
+
+GitHub Pages CDN (Fastly) serves `max-age=300`. iOS Safari caches aggressively.
+
+Three layers:
+1. **GLB loader** — `loader.load('...glb?v=' + Date.now())` — fresh URL every page load
+2. **QR code** — regenerates with `?v=N` query param on every deploy
+3. **Deploy stamp** — `<!-- v=N -->` comment in `index.html`
+
+**When swapping models, ALWAYS:**
+- Bump the `v=` number
+- Regenerate `qr-iphone.png` with the new URL
+- Wait 5 min before testing on phone
+- Test in a private/incognito tab first
 
 ---
 
@@ -90,7 +95,7 @@ READ the Quick Launch checklist in `README.md`. The flyer launches FIRST. The de
 ```powershell
 Set-Location "C:\Users\steve\Augmented Reality\ar-heart"
 
-# 1. Edit index.html (model path, UI labels, deploy stamp comment)
+# 1. Edit index.html (model path, UI labels, deploy stamp)
 # 2. Regenerate QR (N = next version number)
 python -c "import qrcode; qr = qrcode.QRCode(box_size=10, border=4); qr.add_data('https://stefopps.github.io/ar-heart/?v=N'); qr.make(fit=True); img = qr.make_image(fill_color='#ff6600', back_color='#0a0a0f'); img.save('qr-iphone.png'); print('QR v=N done')"
 
@@ -105,24 +110,37 @@ git push origin master
 
 ---
 
+## Local Dev Server
+
+```powershell
+cd "C:\Users\steve\Augmented Reality\ar-heart"
+python -m http.server 8443
+```
+
+Then open: `http://localhost:8443/preview.html`
+
+**Do NOT double-click `preview.html`** — the `file://` protocol blocks XHR to local assets. Always use the server.
+
+---
+
 ## Common Mistakes (Do Not Repeat)
 
-- **"Phone still shows old model"** — you didn't push, or you didn't wait 5 min for CDN, or the phone is using a cached tab. Use a new `?v=` URL in a private tab.
-- **"Model never shows up, no console errors"** — The GLTFLoader may be a glTF 1.0 loader trying to parse a glTF 2.0 file. Check the loader file: if it references `technique`/`KHR_materials_common`, it's 1.0. glTF 2.0 loaders reference `pbrMetallicRoughness`/`KHR_materials_pbr`. Three.js r86 only shipped with a 1.0 loader. **We're now on r94 — this should never happen again.**
-- **"Timeout error after 20s"** — The new hardened loader shows a timeout message if the model doesn't load. Check the browser console (F12) for the real error. If it says HTTP 404, the model path is wrong. If it's a CORS error, the server isn't configured correctly.
-- **"AR marker tracking broke"** — If this happens after an upgrade, the three.js core version may not be compatible with the AR.js/threex stack. Restore `js/three.js.r86.bak` → `js/three.js` and update AGENT_HANDOFF.md with what broke.
-- **"QR code still goes to old version"** — Regenerate `qr-iphone.png` with bumped `v=N`. The QR encodes the URL with the version string.
-- **"Marker doesn't track"** — Works only on phone (needs camera + WebRTC). Desktop `preview.html` is for inspection only.
+- **"Phone still shows old model"** — didn't push, or didn't wait 5 min for CDN, or phone cache. Private tab with fresh `?v=N`.
+- **"Model never shows up, no errors"** — glTF 1.0 loader vs 2.0 file. Check: `pbrMetallicRoughness` = 2.0 (good), `technique`/`KHR_materials_common` = 1.0 (broken). We're on r98 — this shouldn't happen again.
+- **"Cannot read properties of undefined (reading 'extractUrlBase')"** — three.js core is too old for the GLTFLoader. Upgrade to r98+ or add polyfills for `LoaderUtils`/`AnimationUtils`/`BufferGeometryUtils`.
+- **"CORS error: file:// blocked"** — opened `preview.html` by double-clicking. Always use `http://localhost:8443/preview.html`.
+- **"AR marker tracking broke"** — restore `js/three.js.r86.bak` → `js/three.js` and update this doc.
+- **"QR goes to old version"** — regenerate `qr-iphone.png` with new `v=N`.
+- **"Marker doesn't track"** — phone only (needs camera + WebRTC). `preview.html` is inspection only.
 
 ---
 
 ## Home URLs
 
-- **Local dev:** `http://localhost:8443/preview.html` (with server running)
-- **GitHub Pages:** `https://stefopps.github.io/ar-heart?v=7` (current)
+- **Local dev:** `http://localhost:8443/preview.html`
+- **GitHub Pages:** `https://stefopps.github.io/ar-heart?v=8` (current)
 - **Repo:** `https://github.com/stefopps/ar-heart`
 - **Flyer:** `file:///C:/Users/steve/Augmented%20Reality/ar-heart/flyer.html`
-- **Preview:** `file:///C:/Users/steve/Augmented%20Reality/ar-heart/preview.html`
 
 ---
 
