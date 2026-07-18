@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- deploy:2026-07-18 07:18 UTC • v=5 • gltf-2.0-loader-fix • cache-buster deployed -->
+<!-- deploy:2026-07-18 08:01 UTC • v=6 • retopology-obj2glb • cache-buster deployed -->
 <html>
 <head>
 <meta charset="utf-8">
@@ -7,7 +7,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>AR Racer — MeWorld</title>
+<title>AR Retopology — MeWorld</title>
 <style>
   html, body { margin:0; padding:0; overflow:hidden; background:#000; font-family:system-ui,sans-serif; }
   #ui { position:fixed; inset:0; z-index:10; pointer-events:none; }
@@ -79,23 +79,23 @@
 <body>
 
 <div id="loading">
-  <p>MeWorld AR Racer</p>
+  <p>MeWorld AR Retopology</p>
   <div class="spinner"></div>
   <p style="color:#888;font-size:12px">Starting camera...</p>
 </div>
 
 <div id="ui">
   <div class="top-bar">
-    <div class="badge"><div class="label">MeWorld AR</div><div class="value">Crimson Racer</div></div>
+    <div class="badge"><div class="label">MeWorld AR</div><div class="value">Retopology</div></div>
     <div class="badge"><div class="label">Inspired</div><div class="value">@thesunkenblimp</div></div>
   </div>
 </div>
 
 <div class="status-bar" id="status">Point camera at the Hiro marker on your flyer</div>
 <div class="info-panel" id="info">
-  <h3>Crimson Racer</h3>
-  <div class="row"><span class="key">Model</span><span class="val">GLTF 2.0</span></div>
-  <div class="row"><span class="key">Polygons</span><span class="val">Meshy AI</span></div>
+  <h3>Retopology</h3>
+  <div class="row"><span class="key">Source</span><span class="val">Houdini 22</span></div>
+  <div class="row"><span class="key">Type</span><span class="val">OBJ → GLB</span></div>
   <div class="row"><span class="key">Status</span><span class="val" id="statusVal">Ready</span></div>
   <div class="note">Move flyer to rotate<br>Closer = zoom</div>
 </div>
@@ -189,7 +189,7 @@ function initialize() {
   heartGroup = new THREE.Group();
   markerRoot.add(heartGroup);
 
-  loader.load('models/Meshy_AI_Crimson_Polygon_Racer_0717124504_texture.glb?v=' + Date.now(), function(gltf) {
+  loader.load('models/retopology.glb?v=' + Date.now(), function(gltf) {
     var model = gltf.scene;
     // Center and scale the model
     var box = new THREE.Box3().setFromObject(model);
@@ -213,7 +213,7 @@ function initialize() {
   markerRoot.addEventListener('markerFound', function() {
     markerFound = true;
     var s = document.getElementById('status');
-    s.textContent = 'Racer detected — tracking';
+    s.textContent = 'Retopology detected — tracking';
     s.classList.add('found');
     document.getElementById('info').classList.add('visible');
     document.getElementById('instr').classList.add('hidden');

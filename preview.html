@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
-<title>3D Preview — Crimson Racer</title>
+<title>3D Preview — Retopology</title>
 <style>
   html, body { margin:0; padding:0; overflow:hidden; background:#1a1a2e; font-family:system-ui,sans-serif; }
   canvas { display:block; }
@@ -35,7 +35,7 @@
 <body>
 
 <div id="loading">
-  <p>Crimson Polygon Racer</p>
+  <p>Retopology — Houdini 22</p>
   <div class="spinner"></div>
   <p id="loadStatus" style="color:#888;font-size:12px">Loading model...</p>
 </div>
@@ -97,7 +97,7 @@ function init() {
   modelGroup = new THREE.Group();
   scene.add(modelGroup);
 
-  var url = 'models/Meshy_AI_Crimson_Polygon_Racer_0717124504_texture.glb?v=' + Date.now();
+  var url = 'models/retopology.glb?v=' + Date.now();
 
   loader.load(url, function(gltf) {
     var model = gltf.scene;
@@ -111,7 +111,7 @@ function init() {
 
     document.getElementById('loading').classList.add('gone');
     var info = document.getElementById('info');
-    info.textContent = 'Crimson Racer — orbit with mouse/touch';
+    info.textContent = 'Retopology — orbit with mouse/touch';
     info.classList.add('loaded');
   }, function(xhr) {
     if (xhr.total) {
