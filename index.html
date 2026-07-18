@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>AR Retopology — MeWorld</title>
+<title>AR Crimson Racer — MeWorld</title>
 <style>
   html, body { margin:0; padding:0; overflow:hidden; background:#000; font-family:system-ui,sans-serif; }
   #ui { position:fixed; inset:0; z-index:10; pointer-events:none; }
@@ -81,23 +81,23 @@
 <body>
 
 <div id="loading">
-  <p>MeWorld AR Retopology</p>
+  <p>MeWorld AR — Crimson Racer</p>
   <div class="spinner"></div>
   <p id="loadMsg">Starting camera...</p>
 </div>
 
 <div id="ui">
   <div class="top-bar">
-    <div class="badge"><div class="label">MeWorld AR</div><div class="value">Retopology</div></div>
+    <div class="badge"><div class="label">MeWorld AR</div><div class="value">Crimson Racer</div></div>
     <div class="badge"><div class="label">Inspired</div><div class="value">@thesunkenblimp</div></div>
   </div>
 </div>
 
 <div class="status-bar" id="status">Point camera at the Hiro marker on your flyer</div>
 <div class="info-panel" id="info">
-  <h3>Retopology</h3>
+  <h3>Crimson Racer</h3>
   <div class="row"><span class="key">Model</span><span class="val">GLTF 2.0</span></div>
-  <div class="row"><span class="key">Source</span><span class="val">Houdini 22</span></div>
+  <div class="row"><span class="key">Polygons</span><span class="val">Meshy AI</span></div>
   <div class="row"><span class="key">Status</span><span class="val" id="statusVal">Ready</span></div>
   <div class="note">Move flyer to rotate<br>Closer = zoom</div>
 </div>
@@ -130,7 +130,7 @@ var scene, camera, renderer, clock, deltaTime, totalTime;
 var arToolkitSource, arToolkitContext;
 var markerRoot, heartGroup;
 var markerFound = false;
-var MODEL_URL = 'models/retopology.glb';
+var MODEL_URL = 'models/Meshy_AI_Crimson_Polygon_Racer_0717124504_texture.glb';
 var LOAD_TIMEOUT_MS = 20000;
 var modelLoadFinished = false;
 
@@ -198,7 +198,7 @@ function initialize() {
   markerRoot.addEventListener('markerFound', function() {
     markerFound = true;
     var s = document.getElementById('status');
-    s.textContent = 'Retopology detected \u2014 tracking';
+    s.textContent = 'Crimson Racer detected \u2014 tracking';
     s.classList.add('found');
     document.getElementById('info').classList.add('visible');
     document.getElementById('instr').classList.add('hidden');

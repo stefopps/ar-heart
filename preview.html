@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
-<title>3D Preview — Retopology</title>
+<title>3D Preview — Crimson Racer</title>
 <style>
   html, body { margin:0; padding:0; overflow:hidden; background:#1a1a2e; font-family:system-ui,sans-serif; }
   canvas { display:block; }
@@ -42,7 +42,7 @@
 <body>
 
 <div id="loading">
-  <p>Retopology — Houdini 22</p>
+  <p>Crimson Racer — Meshy AI</p>
   <div class="spinner" id="spinner"></div>
   <p id="loadStatus">Loading model...</p>
   <button class="retry-btn" id="retryBtn" onclick="location.reload()">Reload</button>
@@ -60,7 +60,7 @@
 <script>
 var scene, camera, renderer, controls;
 var modelGroup;
-var MODEL_URL = 'models/retopology.glb';
+var MODEL_URL = 'models/Meshy_AI_Crimson_Polygon_Racer_0717124504_texture.glb';
 var LOAD_TIMEOUT_MS = 20000;
 var loadTimedOut = false;
 var loadFinished = false;
@@ -156,7 +156,7 @@ function loadModel() {
 
       document.getElementById('loading').classList.add('gone');
       var info = document.getElementById('info');
-      info.textContent = 'Retopology — orbit with mouse/touch';
+      info.textContent = 'Crimson Racer — orbit with mouse/touch';
       info.classList.add('loaded');
       console.log('[preview] model loaded ok:', gltf);
     }, function(xhr) {
