@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-<!-- deploy:2026-07-18 08:01 UTC • v=6 • retopology-obj2glb • cache-buster deployed -->
 <html>
 <head>
 <meta charset="utf-8">
@@ -31,6 +30,7 @@
     transition:all 0.4s; opacity:0;
   }
   .status-bar.visible { opacity:1; }
+  .status-bar.error { color:#ff5555; border-color:rgba(255,85,85,0.5); }
   @keyframes pulse {
     0%,100% { border-color:rgba(255,102,0,0.3); }
     50% { border-color:rgba(255,102,0,0.8); }
@@ -51,7 +51,7 @@
   .info-panel .key { color:#888; }
   .info-panel .note { color:#666; font-size:9px; margin-top:8px; }
 
-.marker-overlay { position:fixed; inset:0; z-index:100; background:rgba(0,0,0,0.85); display:flex; align-items:center; justify-content:center; }
+  .marker-overlay { position:fixed; inset:0; z-index:100; background:rgba(0,0,0,0.85); display:flex; align-items:center; justify-content:center; }
   .marker-overlay.hidden { display:none; }
   .marker-card { text-align:center; color:#e0e0e0; }
   .marker-card h3 { color:#ff6600; font-size:18px; margin-bottom:16px; }
@@ -64,7 +64,7 @@
   #loading {
     position:fixed; inset:0; z-index:999; background:#0a0a0f;
     display:flex; flex-direction:column; align-items:center; justify-content:center;
-    color:#e0e0e0; transition:opacity 0.6s;
+    color:#e0e0e0; transition:opacity 0.6s; text-align:center; padding:20px; box-sizing:border-box;
   }
   #loading.gone { opacity:0; pointer-events:none; }
   #loading .spinner {
@@ -74,6 +74,8 @@
   }
   @keyframes spin { to { transform:rotate(360deg); } }
   #loading p { font-size:14px; }
+  #loadMsg { color:#888; font-size:12px; max-width:420px; line-height:1.6; }
+  #loadMsg.error { color:#ff5555; }
 </style>
 </head>
 <body>
@@ -81,7 +83,7 @@
 <div id="loading">
   <p>MeWorld AR Retopology</p>
   <div class="spinner"></div>
-  <p style="color:#888;font-size:12px">Starting camera...</p>
+  <p id="loadMsg">Starting camera...</p>
 </div>
 
 <div id="ui">
@@ -94,8 +96,8 @@
 <div class="status-bar" id="status">Point camera at the Hiro marker on your flyer</div>
 <div class="info-panel" id="info">
   <h3>Retopology</h3>
+  <div class="row"><span class="key">Model</span><span class="val">GLTF 2.0</span></div>
   <div class="row"><span class="key">Source</span><span class="val">Houdini 22</span></div>
-  <div class="row"><span class="key">Type</span><span class="val">OBJ → GLB</span></div>
   <div class="row"><span class="key">Status</span><span class="val" id="statusVal">Ready</span></div>
   <div class="note">Move flyer to rotate<br>Closer = zoom</div>
 </div>
@@ -109,8 +111,9 @@
   </div>
 </div>
 
-<div class="instructions" id="instr">Point camera at the ⬛ <b>Hiro marker</b> ⬛ on your printed flyer</div>
+<div class="instructions" id="instr">Point camera at the &#x2B1B; <b>Hiro marker</b> &#x2B1B; on your printed flyer</div>
 
+<!-- v=7 production loader: three.js r94 + glTF 2.0 GLTFLoader + defensive error handling -->
 <script src="js/three.js"></script>
 <script src="js/GLTFLoader.js"></script>
 <script src="jsartoolkit5/artoolkit.min.js"></script>
@@ -125,11 +128,16 @@ var scene, camera, renderer, clock, deltaTime, totalTime;
 var arToolkitSource, arToolkitContext;
 var markerRoot, heartGroup;
 var markerFound = false;
+var MODEL_URL = 'models/retopology.glb';
+var LOAD_TIMEOUT_MS = 20000;
+var modelLoadFinished = false;
 
 initialize();
 animate();
 
 function initialize() {
+  console.log('[AR] three.js revision:', THREE.REVISION);
+
   scene = new THREE.Scene();
   scene.add(new THREE.AmbientLight(0xcccccc, 0.6));
 
@@ -148,7 +156,6 @@ function initialize() {
   deltaTime = 0;
   totalTime = 0;
 
-  // AR source
   arToolkitSource = new THREEx.ArToolkitSource({ sourceType:'webcam' });
 
   function onResize() {
@@ -163,11 +170,12 @@ function initialize() {
     onResize();
     document.getElementById('loading').classList.add('gone');
     document.getElementById('status').classList.add('visible');
+  }, function onSourceError() {
+    setLoadMsg('Camera failed to start. Check camera permissions and reload.', true);
   });
 
   window.addEventListener('resize', onResize);
 
-  // AR context
   arToolkitContext = new THREEx.ArToolkitContext({
     cameraParametersUrl:'data/camera_para.dat',
     detectionMode:'mono'
@@ -177,43 +185,18 @@ function initialize() {
     camera.projectionMatrix.copy(arToolkitContext.getProjectionMatrix());
   });
 
-  // Marker
   markerRoot = new THREE.Group();
   scene.add(markerRoot);
   var markerControls = new THREEx.ArMarkerControls(arToolkitContext, markerRoot, {
     type:'pattern', patternUrl:'data/hiro.patt',
   });
 
-  // ---- LOAD GLB MODEL ----
-  var loader = new THREE.GLTFLoader();
-  heartGroup = new THREE.Group();
-  markerRoot.add(heartGroup);
+  loadModel();
 
-  loader.load('models/retopology.glb?v=' + Date.now(), function(gltf) {
-    var model = gltf.scene;
-    // Center and scale the model
-    var box = new THREE.Box3().setFromObject(model);
-    var size = box.getSize(new THREE.Vector3());
-    var maxDim = Math.max(size.x, size.y, size.z);
-    var scale = 0.8 / maxDim;
-    model.scale.set(scale, scale, scale);
-    model.position.set(0, 0.3, 0);
-    heartGroup.add(model);
-    document.getElementById('statusVal').textContent = 'Loaded';
-    console.log('GLB loaded:', gltf);
-  }, function(xhr) {
-    var pct = Math.round(xhr.loaded / xhr.total * 100);
-    document.getElementById('statusVal').textContent = 'Loading ' + pct + '%';
-  }, function(err) {
-    document.getElementById('statusVal').textContent = 'Error';
-    console.error('GLB load error:', err);
-  });
-
-  // Marker events
   markerRoot.addEventListener('markerFound', function() {
     markerFound = true;
     var s = document.getElementById('status');
-    s.textContent = 'Retopology detected — tracking';
+    s.textContent = 'Retopology detected \u2014 tracking';
     s.classList.add('found');
     document.getElementById('info').classList.add('visible');
     document.getElementById('instr').classList.add('hidden');
@@ -221,11 +204,76 @@ function initialize() {
   markerRoot.addEventListener('markerLost', function() {
     markerFound = false;
     var s = document.getElementById('status');
-    s.textContent = 'Marker lost — point camera at flyer';
+    s.textContent = 'Marker lost \u2014 point camera at flyer';
     s.classList.remove('found');
     document.getElementById('info').classList.remove('visible');
     document.getElementById('instr').classList.remove('hidden');
   });
+}
+
+function loadModel() {
+  var loader = new THREE.GLTFLoader();
+  heartGroup = new THREE.Group();
+  markerRoot.add(heartGroup);
+
+  var timeoutId = setTimeout(function() {
+    if (modelLoadFinished) return;
+    document.getElementById('statusVal').textContent = 'Timeout';
+    console.error('[AR] Model load timed out after ' + (LOAD_TIMEOUT_MS/1000) + 's \u2014 check console for the real error and verify the .glb path.');
+  }, LOAD_TIMEOUT_MS);
+
+  try {
+    loader.load(MODEL_URL + '?v=' + Date.now(), function(gltf) {
+      modelLoadFinished = true;
+      clearTimeout(timeoutId);
+
+      if (!gltf || !gltf.scene) {
+        document.getElementById('statusVal').textContent = 'Error: no scene';
+        console.error('[AR] Loader returned no scene.');
+        return;
+      }
+
+      var model = gltf.scene;
+      var box = new THREE.Box3().setFromObject(model);
+      var size = box.getSize(new THREE.Vector3());
+      var maxDim = Math.max(size.x, size.y, size.z);
+
+      if (!isFinite(maxDim) || maxDim === 0) {
+        document.getElementById('statusVal').textContent = 'Error: empty model';
+        console.error('[AR] Model has zero bounding box.');
+        return;
+      }
+
+      var scale = 0.8 / maxDim;
+      model.scale.set(scale, scale, scale);
+      model.position.set(0, 0.3, 0);
+      heartGroup.add(model);
+      document.getElementById('statusVal').textContent = 'Loaded';
+      console.log('[AR] GLB loaded:', gltf);
+    }, function(xhr) {
+      if (modelLoadFinished) return;
+      if (xhr.total) {
+        var pct = Math.round(xhr.loaded / xhr.total * 100);
+        document.getElementById('statusVal').textContent = 'Loading ' + pct + '%';
+      }
+    }, function(err) {
+      modelLoadFinished = true;
+      clearTimeout(timeoutId);
+      document.getElementById('statusVal').textContent = 'Error';
+      console.error('[AR] GLB load error:', err);
+    });
+  } catch (e) {
+    modelLoadFinished = true;
+    clearTimeout(timeoutId);
+    document.getElementById('statusVal').textContent = 'Error';
+    console.error('[AR] Synchronous exception during load():', e);
+  }
+}
+
+function setLoadMsg(msg, isError) {
+  var el = document.getElementById('loadMsg');
+  el.textContent = msg;
+  if (isError) el.classList.add('error');
 }
 
 function update() {

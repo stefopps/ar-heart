@@ -21,7 +21,7 @@
   #loading {
     position:fixed; inset:0; z-index:10; background:#1a1a2e;
     display:flex; flex-direction:column; align-items:center; justify-content:center;
-    color:#e0e0e0; transition:opacity 0.6s;
+    color:#e0e0e0; transition:opacity 0.6s; text-align:center; padding:20px; box-sizing:border-box;
   }
   #loading.gone { opacity:0; pointer-events:none; }
   .spinner {
@@ -30,14 +30,22 @@
     margin:16px 0;
   }
   @keyframes spin { to { transform:rotate(360deg); } }
+  #loadStatus { color:#888; font-size:12px; max-width:420px; line-height:1.6; }
+  #loadStatus.error { color:#ff5555; }
+  .retry-btn {
+    display:none; margin-top:16px; padding:10px 28px; background:#ff6600; color:#000;
+    border:none; border-radius:8px; font-weight:600; font-size:13px; cursor:pointer;
+  }
+  .retry-btn.show { display:inline-block; }
 </style>
 </head>
 <body>
 
 <div id="loading">
   <p>Retopology — Houdini 22</p>
-  <div class="spinner"></div>
-  <p id="loadStatus" style="color:#888;font-size:12px">Loading model...</p>
+  <div class="spinner" id="spinner"></div>
+  <p id="loadStatus">Loading model...</p>
+  <button class="retry-btn" id="retryBtn" onclick="location.reload()">Reload</button>
 </div>
 
 <div class="info" id="info">Loading...</div>
@@ -50,14 +58,19 @@
 <script>
 var scene, camera, renderer, controls;
 var modelGroup;
+var MODEL_URL = 'models/retopology.glb';
+var LOAD_TIMEOUT_MS = 20000;
+var loadTimedOut = false;
+var loadFinished = false;
 
 init();
 
 function init() {
+  console.log('[preview] three.js revision:', THREE.REVISION);
+
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0x1a1a2e);
 
-  // Lighting
   scene.add(new THREE.AmbientLight(0x404060, 0.8));
   var key = new THREE.DirectionalLight(0xffffff, 1.5);
   key.position.set(5, 8, 5);
@@ -69,7 +82,6 @@ function init() {
   rim.position.set(0, 0, -5);
   scene.add(rim);
 
-  // Ground grid
   var grid = new THREE.GridHelper(4, 20, 0x333344, 0x222233);
   grid.position.y = -0.5;
   scene.add(grid);
@@ -92,39 +104,93 @@ function init() {
   controls.maxDistance = 15;
   controls.update();
 
-  // Load GLB
-  var loader = new THREE.GLTFLoader();
   modelGroup = new THREE.Group();
   scene.add(modelGroup);
 
-  var url = 'models/retopology.glb?v=' + Date.now();
-
-  loader.load(url, function(gltf) {
-    var model = gltf.scene;
-    var box = new THREE.Box3().setFromObject(model);
-    var size = box.getSize(new THREE.Vector3());
-    var maxDim = Math.max(size.x, size.y, size.z);
-    var scale = 0.8 / maxDim;
-    model.scale.set(scale, scale, scale);
-    model.position.set(0, 0.3, 0);
-    modelGroup.add(model);
-
-    document.getElementById('loading').classList.add('gone');
-    var info = document.getElementById('info');
-    info.textContent = 'Retopology — orbit with mouse/touch';
-    info.classList.add('loaded');
-  }, function(xhr) {
-    if (xhr.total) {
-      var pct = Math.round(xhr.loaded / xhr.total * 100);
-      document.getElementById('loadStatus').textContent = 'Loading... ' + pct + '%';
-    }
-  }, function(err) {
-    document.getElementById('loadStatus').textContent = 'Error loading model';
-    console.error('GLB error:', err);
-  });
+  loadModel();
 
   window.addEventListener('resize', onResize);
   animate();
+}
+
+function loadModel() {
+  var loader = new THREE.GLTFLoader();
+  var url = MODEL_URL + '?v=' + Date.now();
+
+  // Belt-and-suspenders: some old loader builds swallow parse errors inside
+  // internal Promises and never call onLoad or onError. This timeout makes
+  // sure the user always sees SOMETHING instead of an infinite spinner.
+  var timeoutId = setTimeout(function() {
+    if (loadFinished) return;
+    loadTimedOut = true;
+    showError('Timed out loading model after ' + (LOAD_TIMEOUT_MS/1000) + 's. Check the browser console (F12) for the real error, and confirm the .glb path/filename is correct.');
+  }, LOAD_TIMEOUT_MS);
+
+  try {
+    loader.load(url, function(gltf) {
+      loadFinished = true;
+      clearTimeout(timeoutId);
+      if (loadTimedOut) return; // already showed timeout error, don't fight the UI
+
+      if (!gltf || !gltf.scene) {
+        showError('Loader returned no scene. The .glb file may be corrupt or an unsupported glTF version.');
+        return;
+      }
+
+      var model = gltf.scene;
+      var box = new THREE.Box3().setFromObject(model);
+      var size = box.getSize(new THREE.Vector3());
+      var maxDim = Math.max(size.x, size.y, size.z);
+
+      if (!isFinite(maxDim) || maxDim === 0) {
+        showError('Model loaded but has no visible geometry (zero bounding box).');
+        return;
+      }
+
+      var scale = 0.8 / maxDim;
+      model.scale.set(scale, scale, scale);
+      model.position.set(0, 0.3, 0);
+      modelGroup.add(model);
+
+      document.getElementById('loading').classList.add('gone');
+      var info = document.getElementById('info');
+      info.textContent = 'Retopology — orbit with mouse/touch';
+      info.classList.add('loaded');
+      console.log('[preview] model loaded ok:', gltf);
+    }, function(xhr) {
+      if (loadFinished || loadTimedOut) return;
+      if (xhr.total) {
+        var pct = Math.round(xhr.loaded / xhr.total * 100);
+        document.getElementById('loadStatus').textContent = 'Loading... ' + pct + '%';
+      } else {
+        document.getElementById('loadStatus').textContent = 'Loading... ' + Math.round(xhr.loaded/1024) + 'KB';
+      }
+    }, function(err) {
+      loadFinished = true;
+      clearTimeout(timeoutId);
+      console.error('[preview] GLB load error:', err);
+      var msg = 'Failed to load model.';
+      if (err && err.target && err.target.status) {
+        msg += ' HTTP ' + err.target.status + ' — check that "' + MODEL_URL + '" exists at that exact path.';
+      } else {
+        msg += ' Check the browser console (F12) for details — likely a wrong file path or a CORS/mime-type issue from your local server.';
+      }
+      showError(msg);
+    });
+  } catch (e) {
+    loadFinished = true;
+    clearTimeout(timeoutId);
+    console.error('[preview] Synchronous exception during load():', e);
+    showError('Loader threw an exception: ' + e.message);
+  }
+}
+
+function showError(msg) {
+  document.getElementById('spinner').style.display = 'none';
+  var status = document.getElementById('loadStatus');
+  status.textContent = msg;
+  status.classList.add('error');
+  document.getElementById('retryBtn').classList.add('show');
 }
 
 function onResize() {
