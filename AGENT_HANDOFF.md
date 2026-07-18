@@ -1,8 +1,8 @@
 # AGENT HANDOFF — AR Heart / Racer (MeWorld)
 
 **Last agent:** Cursor (claude-sonnet-4)
-**Date:** 2026-07-18 01:15 UTC
-**Status:** DEPLOYED — Orange theme v=4 live on GitHub Pages
+**Date:** 2026-07-18 07:18 UTC
+**Status:** DEPLOYED — v=5 glTF 2.0 loader fix live on GitHub Pages
 
 ---
 
@@ -14,13 +14,19 @@ READ the Quick Launch checklist in `README.md`. The flyer launches FIRST. The de
 
 ## What We Built / Fixed This Session
 
-### 1. Model Swap: Procedural Heart → Crimson Polygon Racer GLB
+### 1. glTF 2.0 Loader Fix (v=5) — THE MODEL NOW RENDERS
+**The problem:** The `GLTFLoader.js` from session 1 was a **glTF 1.0** loader (uses `technique`/`program`/`shader` materials, `KHR_materials_common`, binary header `version: 1`). Meshy AI exports **glTF 2.0** GLB files (PBR `pbrMetallicRoughness` materials). The 1.0 loader silently failed — model never appeared in `preview.html` or the AR `index.html`, despite no console errors.
+
+**The fix:** Replaced `js/GLTFLoader.js` with the three.js r94 glTF-2.0-capable rewrite (Don McCurdy). Still plain `<script>`-tag style (`THREE.GLTFLoader` global), compatible with existing r86 `js/three.js` and AR.js/threex stack. No code changes needed in `index.html` or `preview.html` — the existing `loader.load(url, function(gltf){ var model = gltf.scene; ... })` is already correct.
+
+**Lesson:** If any agent adds a new model and it "just doesn't show up" with no console errors, check whether the GLTFLoader supports the model's glTF version. Three.js r86 only shipped with a glTF 1.0 loader. glTF 2.0 support landed in r94+.
+
+### 2. Model Swap: Procedural Heart → Crimson Polygon Racer GLB
 - Stripped `createHeart()`, `startBPM()`, heartbeat animation from `index.html`
-- Added `GLTFLoader.js` (Three.js r86 compatible) at `js/GLTFLoader.js`
 - Model lives at `models/Meshy_AI_Crimson_Polygon_Racer_0717124504_texture.glb` (17.7MB)
 - `preview.html` — 3D viewer with orbit controls, no AR needed. Open locally to inspect model before phone test.
 
-### 2. Cache-Busting Pipeline (v=4)
+### 3. Cache-Busting Pipeline (v=4→v=5)
 **The problem:** GitHub Pages CDN (Fastly) serves `max-age=300`. iOS Safari caches aggressively. Every push takes up to 5 min to propagate. The phone won't show changes immediately.
 **The fix:** Three layers of cache busting:
 1. **GLB loader** — `loader.load('...glb?v=' + Date.now())` — fresh URL every page load
@@ -33,13 +39,13 @@ READ the Quick Launch checklist in `README.md`. The flyer launches FIRST. The de
 - Wait 5 min before testing on phone
 - Test in a private/incognito tab first
 
-### 3. Orange Theme (v=4 Visual Indicator)
+### 4. Orange Theme (v=4 Visual Indicator)
 - All `#00e5a0` (green) replaced with `#ff6600` (orange) in `index.html`
 - Hiro marker image tinted orange in flyer and AR overlay
 - "v4" badge on flyer marker box
 - If you see green, you're looking at a cached old version
 
-### 4. Agent Checklist Added to README
+### 5. Agent Checklist Added to README
 - Step-by-step launch commands
 - How to swap models (with table of which lines to edit)
 - CDN wait warning
@@ -88,6 +94,7 @@ git push origin master
 
 - **"Phone still shows the heart"** — you didn't push, or you didn't wait 5 min for CDN, or the phone is using a cached tab. Use a new `?v=` URL in a private tab.
 - **"server.py doesn't work"** — OpenSSL not installed. Use the one-liner `python -c "import http.server;..."` from README instead.
+- **"Model never shows up, no console errors"** — The GLTFLoader may be a glTF 1.0 loader trying to parse a glTF 2.0 file. Check the loader file: if it references `technique`/`KHR_materials_common`, it's 1.0. glTF 2.0 loaders reference `pbrMetallicRoughness`/`KHR_materials_pbr`. Three.js r86 only shipped with a 1.0 loader — you need r94+ for 2.0. The correct loader is at `js/GLTFLoader.js` (Don McCurdy author).
 - **"GLTFLoader error"** — Three.js is r86. GLTFLoader must match. Use the one at `js/GLTFLoader.js` or download from `https://cdn.jsdelivr.net/npm/three@0.86.0/examples/js/loaders/GLTFLoader.js`
 - **"QR code still goes to old version"** — Regenerate `qr-iphone.png` with bumped `v=N`. The QR encodes the URL with the version string.
 - **"Marker doesn't track"** — Works only on phone (needs camera + WebRTC). The `flyer.html` marker must be visible to the camera. Desktop `preview.html` is for inspection only.
@@ -97,7 +104,7 @@ git push origin master
 ## Home URLs
 
 - **Local dev:** `http://localhost:8443` (with server running)
-- **GitHub Pages:** `https://stefopps.github.io/ar-heart?v=4` (current)
+- **GitHub Pages:** `https://stefopps.github.io/ar-heart?v=5` (current)
 - **Repo:** `https://github.com/stefopps/ar-heart`
 - **Flyer:** `file:///C:/Users/steve/Augmented%20Reality/ar-heart/flyer.html`
 - **Preview:** `file:///C:/Users/steve/Augmented%20Reality/ar-heart/preview.html`
