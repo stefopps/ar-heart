@@ -52,8 +52,12 @@
 <div class="controls-hint">Drag to orbit &bull; Scroll to zoom &bull; Right-drag to pan</div>
 
 <script src="js/three.js"></script>
-<!-- Polyfill: r94 three.js lacks THREE.LoaderUtils (added r97+), needed by GLTFLoader.js -->
-<script>THREE.LoaderUtils={extractUrlBase:function(u){return u.substring(0,u.lastIndexOf('/')+1)},decodeText:function(a){var d=new TextDecoder();return d.decode(a)}}</script>
+<!-- Polyfill: r94 three.js built file is missing some example utilities used by its own GLTFLoader -->
+<script>
+THREE.LoaderUtils = THREE.LoaderUtils || { extractUrlBase: function(u) { return u.substring(0, u.lastIndexOf('/') + 1); }, decodeText: function(a) { return new TextDecoder().decode(a); } };
+THREE.BufferGeometryUtils = THREE.BufferGeometryUtils || { mergeBufferGeometries: function(g) { return g[0]; } };
+THREE.AnimationUtils = THREE.AnimationUtils || { arraySlice: function(a, b, c) { return Array.prototype.slice.call(a, b, c); } };
+</script>
 <script src="js/GLTFLoader.js"></script>
 <script src="js/OrbitControls.js"></script>
 
