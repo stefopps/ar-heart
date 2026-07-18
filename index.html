@@ -61,6 +61,14 @@
   }
   .instructions.hidden { opacity:0; }
 
+  .touch-hint {
+    position:fixed; bottom:80px; left:50%; transform:translateX(-50%);
+    color:rgba(255,102,0,0.6); font-size:11px; text-align:center;
+    transition:opacity 0.5s; opacity:0; pointer-events:none;
+  }
+  .touch-hint.visible { opacity:1; }
+  .touch-hint.hidden { opacity:0; }
+
   #loading {
     position:fixed; inset:0; z-index:999; background:#0a0a0f;
     display:flex; flex-direction:column; align-items:center; justify-content:center;
@@ -99,7 +107,7 @@
   <div class="row"><span class="key">Model</span><span class="val">GLTF 2.0</span></div>
   <div class="row"><span class="key">Polygons</span><span class="val">Meshy AI</span></div>
   <div class="row"><span class="key">Status</span><span class="val" id="statusVal">Ready</span></div>
-  <div class="note">Move flyer to rotate<br>Closer = zoom</div>
+  <div class="note">Swipe to rotate<br>Pinch to zoom</div>
 </div>
 
 <div class="marker-overlay" id="markerOverlay">
@@ -112,8 +120,9 @@
 </div>
 
 <div class="instructions" id="instr">Point camera at the &#x2B1B; <b>Hiro marker</b> &#x2B1B; on your printed flyer</div>
+<div class="touch-hint" id="touchHint">&#x270B; Swipe to rotate &nbsp; &#x1F44C; Pinch to zoom</div>
 
-<!-- v=7 production loader: three.js r94 + glTF 2.0 GLTFLoader + defensive error handling -->
+<!-- v=9 interactive AR: r98 three.js + touch rotation + pinch zoom + smoothed tracking + better lighting -->
 <script src="js/three.js"></script>
 <script src="js/GLTFLoader.js"></script>
 <script src="jsartoolkit5/artoolkit.min.js"></script>
@@ -122,14 +131,28 @@
 <script src="threex/threex-artoolkitcontext.js"></script>
 <script src="threex/threex-arbasecontrols.js"></script>
 <script src="threex/threex-armarkercontrols.js"></script>
+<script src="threex/threex-arsmoothedcontrols.js"></script>
 
 <script>
-var scene, camera, renderer, clock, deltaTime, totalTime;
+var scene, camera, renderer, clock;
 var arToolkitSource, arToolkitContext;
-var markerRoot, heartGroup;
+var markerRoot, smoothRoot, touchOrbit, modelGroup;
+var smoothControls;
 var markerFound = false;
+var modelLoaded = false;
+
 var MODEL_URL = 'models/Meshy_AI_Crimson_Polygon_Racer_0717124504_texture.glb';
 var LOAD_TIMEOUT_MS = 45000;
+
+// Touch state
+var isTouching = false;
+var touchLastX = 0, touchLastY = 0;
+var touchStartDistance = 0;
+var touchStartScale = 1;
+var currentScale = 1;
+var targetRotY = 0, targetRotX = 0;
+var currentRotY = 0, currentRotX = 0;
+var autoRotateSpeed = 0.003;
 var modelLoadFinished = false;
 
 initialize();
@@ -139,22 +162,36 @@ function initialize() {
   console.log('[AR] three.js revision:', THREE.REVISION);
 
   scene = new THREE.Scene();
-  scene.add(new THREE.AmbientLight(0xcccccc, 0.6));
+
+  // === Better lighting (3-point setup like preview.html) ===
+  scene.add(new THREE.AmbientLight(0x404060, 0.8));
+  var key = new THREE.DirectionalLight(0xffffff, 1.5);
+  key.position.set(5, 8, 5);
+  scene.add(key);
+  var fill = new THREE.DirectionalLight(0xff8866, 0.6);
+  fill.position.set(-3, 2, -3);
+  scene.add(fill);
+  var rim = new THREE.DirectionalLight(0x6688ff, 0.5);
+  rim.position.set(0, 0, -5);
+  scene.add(rim);
 
   camera = new THREE.Camera();
   scene.add(camera);
 
-  renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+  // === Higher-quality renderer ===
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setClearColor(new THREE.Color('lightgrey'), 0);
   renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.domElement.style.position = 'absolute';
   renderer.domElement.style.top = '0px';
   renderer.domElement.style.left = '0px';
   document.body.appendChild(renderer.domElement);
 
+  // === Touch interaction ===
+  setupTouchControls();
+
   clock = new THREE.Clock();
-  deltaTime = 0;
-  totalTime = 0;
 
   arToolkitSource = new THREEx.ArToolkitSource({ sourceType:'webcam' });
 
@@ -185,46 +222,141 @@ function initialize() {
     camera.projectionMatrix.copy(arToolkitContext.getProjectionMatrix());
   });
 
+  // === Scene hierarchy ===
+  // markerRoot → ArMarkerControls (tracks physical marker position)
+  //   smoothRoot → ArSmoothedControls (smooths out jitter)
+  //     touchOrbit → user touch rotation + pinch scale
+  //       modelGroup → loaded GLB model
+
   markerRoot = new THREE.Group();
   scene.add(markerRoot);
-  var markerControls = new THREEx.ArMarkerControls(arToolkitContext, markerRoot, {
-    type:'pattern', patternUrl:'data/hiro.patt',
+  new THREEx.ArMarkerControls(arToolkitContext, markerRoot, {
+    type:'pattern', patternUrl:'data/hiro.patt'
   });
+
+  smoothRoot = new THREE.Group();
+  markerRoot.add(smoothRoot);
+  smoothControls = new THREEx.ArSmoothedControls(smoothRoot, {
+    lerpPosition: 0.8,
+    lerpQuaternion: 0.2,
+    lerpScale: 0.7,
+    minVisibleDelay: 0,
+    minUnvisibleDelay: 0.2
+  });
+
+  touchOrbit = new THREE.Group();
+  smoothRoot.add(touchOrbit);
+
+  modelGroup = new THREE.Group();
+  touchOrbit.add(modelGroup);
 
   loadModel();
 
-  markerRoot.addEventListener('markerFound', function() {
+  // Marker events
+  smoothControls.addEventListener('markerFound', function() {
     markerFound = true;
     var s = document.getElementById('status');
     s.textContent = 'Crimson Racer detected \u2014 tracking';
     s.classList.add('found');
     document.getElementById('info').classList.add('visible');
     document.getElementById('instr').classList.add('hidden');
+    document.getElementById('touchHint').classList.add('visible');
   });
-  markerRoot.addEventListener('markerLost', function() {
+  smoothControls.addEventListener('markerLost', function() {
     markerFound = false;
     var s = document.getElementById('status');
     s.textContent = 'Marker lost \u2014 point camera at flyer';
     s.classList.remove('found');
     document.getElementById('info').classList.remove('visible');
     document.getElementById('instr').classList.remove('hidden');
+    document.getElementById('touchHint').classList.remove('visible');
   });
+}
+
+function setupTouchControls() {
+  var canvas = renderer.domElement;
+
+  canvas.addEventListener('touchstart', function(e) {
+    e.preventDefault();
+    isTouching = true;
+    if (e.touches.length === 1) {
+      touchLastX = e.touches[0].clientX;
+      touchLastY = e.touches[0].clientY;
+    } else if (e.touches.length === 2) {
+      var dx = e.touches[0].clientX - e.touches[1].clientX;
+      var dy = e.touches[0].clientY - e.touches[1].clientY;
+      touchStartDistance = Math.sqrt(dx*dx + dy*dy);
+      touchStartScale = currentScale;
+    }
+  }, {passive: false});
+
+  canvas.addEventListener('touchmove', function(e) {
+    e.preventDefault();
+    if (e.touches.length === 1 && isTouching) {
+      var dx = e.touches[0].clientX - touchLastX;
+      var dy = e.touches[0].clientY - touchLastY;
+      targetRotY += dx * 0.005;
+      targetRotX += dy * 0.005;
+      targetRotX = Math.max(-Math.PI/3, Math.min(Math.PI/3, targetRotX));
+      touchLastX = e.touches[0].clientX;
+      touchLastY = e.touches[0].clientY;
+    } else if (e.touches.length === 2) {
+      var dx2 = e.touches[0].clientX - e.touches[1].clientX;
+      var dy2 = e.touches[0].clientY - e.touches[1].clientY;
+      var dist = Math.sqrt(dx2*dx2 + dy2*dy2);
+      if (touchStartDistance > 0) {
+        var scaleFactor = dist / touchStartDistance;
+        currentScale = Math.max(0.3, Math.min(3.0, touchStartScale * scaleFactor));
+        touchOrbit.scale.setScalar(currentScale);
+      }
+    }
+  }, {passive: false});
+
+  canvas.addEventListener('touchend', function(e) {
+    if (e.touches.length === 0) {
+      isTouching = false;
+      touchStartDistance = 0;
+    }
+  });
+
+  // Mouse fallback for desktop debugging
+  var mouseDown = false;
+  canvas.addEventListener('mousedown', function(e) {
+    mouseDown = true;
+    touchLastX = e.clientX;
+    touchLastY = e.clientY;
+  });
+  canvas.addEventListener('mousemove', function(e) {
+    if (!mouseDown) return;
+    var dx = e.clientX - touchLastX;
+    var dy = e.clientY - touchLastY;
+    targetRotY += dx * 0.005;
+    targetRotX += dy * 0.005;
+    targetRotX = Math.max(-Math.PI/3, Math.min(Math.PI/3, targetRotX));
+    touchLastX = e.clientX;
+    touchLastY = e.clientY;
+  });
+  canvas.addEventListener('mouseup', function() { mouseDown = false; });
+  canvas.addEventListener('wheel', function(e) {
+    e.preventDefault();
+    currentScale = Math.max(0.3, Math.min(3.0, currentScale - e.deltaY * 0.001));
+    touchOrbit.scale.setScalar(currentScale);
+  }, {passive: false});
 }
 
 function loadModel() {
   var loader = new THREE.GLTFLoader();
-  heartGroup = new THREE.Group();
-  markerRoot.add(heartGroup);
 
   var timeoutId = setTimeout(function() {
     if (modelLoadFinished) return;
     document.getElementById('statusVal').textContent = 'Timeout';
-    console.error('[AR] Model load timed out after ' + (LOAD_TIMEOUT_MS/1000) + 's \u2014 check console for the real error and verify the .glb path.');
+    console.error('[AR] Model load timed out after ' + (LOAD_TIMEOUT_MS/1000) + 's \u2014 check console and verify the .glb path.');
   }, LOAD_TIMEOUT_MS);
 
   try {
     loader.load(MODEL_URL + '?v=' + Date.now(), function(gltf) {
       modelLoadFinished = true;
+      modelLoaded = true;
       clearTimeout(timeoutId);
 
       if (!gltf || !gltf.scene) {
@@ -247,7 +379,7 @@ function loadModel() {
       var scale = 0.8 / maxDim;
       model.scale.set(scale, scale, scale);
       model.position.set(0, 0.3, 0);
-      heartGroup.add(model);
+      modelGroup.add(model);
       document.getElementById('statusVal').textContent = 'Loaded';
       console.log('[AR] GLB loaded:', gltf);
     }, function(xhr) {
@@ -280,6 +412,16 @@ function update() {
   if (arToolkitSource.ready !== false) {
     arToolkitContext.update(arToolkitSource.domElement);
   }
+
+  // Smooth lerp rotation toward target (both touch and auto-rotate feed into this)
+  if (markerFound && !isTouching) {
+    targetRotY += autoRotateSpeed;
+  }
+  currentRotY += (targetRotY - currentRotY) * 0.1;
+  currentRotX += (targetRotX - currentRotX) * 0.1;
+  if (!modelLoaded) return;
+  touchOrbit.rotation.y = currentRotY;
+  touchOrbit.rotation.x = currentRotX;
 }
 
 function render() {
