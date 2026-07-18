@@ -115,12 +115,6 @@
 
 <!-- v=7 production loader: three.js r94 + glTF 2.0 GLTFLoader + defensive error handling -->
 <script src="js/three.js"></script>
-<!-- Polyfill: r94 three.js built file is missing some example utilities used by its own GLTFLoader -->
-<script>
-THREE.LoaderUtils = THREE.LoaderUtils || { extractUrlBase: function(u) { return u.substring(0, u.lastIndexOf('/') + 1); }, decodeText: function(a) { return new TextDecoder().decode(a); } };
-THREE.BufferGeometryUtils = THREE.BufferGeometryUtils || { mergeBufferGeometries: function(g) { return g[0]; } };
-THREE.AnimationUtils = THREE.AnimationUtils || { arraySlice: function(a, b, c) { return Array.prototype.slice.call(a, b, c); } };
-</script>
 <script src="js/GLTFLoader.js"></script>
 <script src="jsartoolkit5/artoolkit.min.js"></script>
 <script src="jsartoolkit5/artoolkit.api.js"></script>
@@ -135,7 +129,7 @@ var arToolkitSource, arToolkitContext;
 var markerRoot, heartGroup;
 var markerFound = false;
 var MODEL_URL = 'models/Meshy_AI_Crimson_Polygon_Racer_0717124504_texture.glb';
-var LOAD_TIMEOUT_MS = 20000;
+var LOAD_TIMEOUT_MS = 45000;
 var modelLoadFinished = false;
 
 initialize();
