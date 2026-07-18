@@ -123,6 +123,102 @@ Then open: `http://localhost:8443/preview.html`
 
 ---
 
+## Smoke-Test / Screenshot Debugging (How We Verify Without Browser Console)
+
+Since agents can't directly read the browser console or DOM, we use **desktop screenshots as a visual debugger**. Every error in this project was caught by iterating: serve → open → screenshot → inspect → fix → repeat.
+
+### The Loop
+
+```
+1. Kill old servers   →  2. Start fresh python server
+3. HTTP-verify files  →  4. Start-Process open in browser
+5. Sleep (model size dependent)  →  6. CopyFromScreen capture desktop
+7. Read the PNG back  →  8. Inspect: loaded? error text? spinner? blank?
+9. If broken → fix code → go to 1
+```
+
+### Step-by-Step Commands
+
+**1. Kill stale servers and restart:**
+```powershell
+# Kill any existing python servers on 8443
+Stop-Process -Id (Get-NetTCPConnection -LocalPort 8443 -ErrorAction SilentlyContinue).OwningProcess -Force -ErrorAction SilentlyContinue
+
+# Start fresh
+cd "C:\Users\steve\Augmented Reality\ar-heart"
+python -m http.server 8443
+```
+
+**2. Verify files are serving (sanity check before opening browser):**
+```powershell
+$r = Invoke-WebRequest -Uri "http://localhost:8443/preview.html" -UseBasicParsing
+"preview.html: HTTP $($r.StatusCode) ($($r.RawContentLength) bytes)"
+
+$r2 = Invoke-WebRequest -Uri "http://localhost:8443/models/retopology.glb" -UseBasicParsing
+"model: HTTP $($r2.StatusCode) ($([math]::Round($r2.RawContentLength/1KB,0)) KB)"
+```
+If HTTP != 200 here, the file path is wrong — fix it before opening the browser.
+
+**3. Open browser, wait, screenshot:**
+```powershell
+# Wait time MUST account for model size:
+#    <1MB model → 3-5 seconds
+#    17MB model → 15-25 seconds (network + GLTF parsing)
+Start-Process "http://localhost:8443/preview.html"
+Start-Sleep -Seconds 22
+
+Add-Type -AssemblyName System.Drawing, System.Windows.Forms
+$screen = [System.Windows.Forms.Screen]::PrimaryScreen
+$bmp = New-Object System.Drawing.Bitmap($screen.Bounds.Width, $screen.Bounds.Height)
+$g = [System.Drawing.Graphics]::FromImage($bmp)
+$g.CopyFromScreen(0, 0, 0, 0, $screen.Bounds.Size)
+$bmp.Save("_smoke_test.png", [System.Drawing.Imaging.ImageFormat]::Png)
+$g.Dispose(); $bmp.Dispose()
+```
+
+**4. Inspect the screenshot:**
+```powershell
+# Read back and visually check: is the model visible? is there an error overlay?
+code _smoke_test.png
+```
+
+### What to Look For in the Screenshot
+
+| Visual Sign | What It Means |
+|-------------|---------------|
+| Dark purple scene + grid floor + 3D model visible | Model loaded successfully |
+| "Crimson Racer — orbit with mouse/touch" text at bottom | Confirmed: load succeeded (this text only appears after onLoad fires) |
+| "Timed out loading model" error | GLTFLoader never fired onLoad — path wrong, glTF version mismatch, or file too big for the timeout |
+| "Loader threw an exception: Cannot read properties..." | three.js version too old for the GLTFLoader — upgrade or polyfill |
+| "Load error: HTTP 404" | Model path in MODEL_URL doesn't match the actual file |
+| Spinner still spinning, no model | Loading still in progress — increase the wait time or check network |
+| White/blank page | Server not running or html has a syntax error |
+| "Failed to load" + Reload button visible | The catch/onError handler fired — check the error message text |
+| "file://" mention in error | User double-clicked instead of using server URL |
+
+### Real Bugs Caught with This Method
+
+| Screenshot showed | Root Cause | Fix |
+|-------------------|------------|-----|
+| "file:// CORS blocked" error | Double-clicked preview.html instead of server URL | Added `file://` detection in error handler, doc warning |
+| "Cannot read properties of undefined (extractUrlBase)" | r94 three.js doesn't export LoaderUtils | Upgraded to r98 (native exports) |
+| Spinner after 10s, then 25s — no model | 17MB GLB only partially loaded at 10s | Increased timeout from 20s to 45s, added longer screenshot waits |
+| Small wireframe visible — user said "I don't see a car" | Wrong model loaded (retopology.glb not Crimson Racer) | Swapped MODEL_URL back to Meshy AI GLB |
+| Car loaded but "controls too fast, twitchy" | Default OrbitControls rotateSpeed=1.0 | Set rotateSpeed=0.3, dampingFactor=0.15 |
+
+### Model Size → Screenshot Wait Time Guide
+
+| Model Size | Min Wait | Reason |
+|------------|----------|--------|
+| <500KB | 3-5s | Instantly serves + parses |
+| 1-5MB | 6-10s | Still fast over localhost |
+| 10-20MB | 15-25s | Network transfer + GLTF JSON parsing + texture decode |
+| 50MB+ | 30-45s | Needs the full 45s timeout window |
+
+**Golden rule:** always take at least TWO screenshots — one at the minimum wait time, one after waiting longer. If both show the same error/state, it's a real bug, not a timing issue.
+
+---
+
 ## Common Mistakes (Do Not Repeat)
 
 - **"Phone still shows old model"** — didn't push, or didn't wait 5 min for CDN, or phone cache. Private tab with fresh `?v=N`.

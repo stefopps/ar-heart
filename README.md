@@ -27,6 +27,12 @@ Start-Process "http://localhost:8443/preview.html"
 
 Do NOT double-click `preview.html` — the `file://` protocol blocks local asset loading.
 
+4. **Smoke-test with screenshot** (verify model actually rendered):
+```powershell
+Start-Sleep -Seconds 22; Add-Type -AssemblyName System.Drawing, System.Windows.Forms; $bmp = New-Object System.Drawing.Bitmap([System.Windows.Forms.Screen]::PrimaryScreen.Bounds.Width, [System.Windows.Forms.Screen]::PrimaryScreen.Bounds.Height); $g = [System.Drawing.Graphics]::FromImage($bmp); $g.CopyFromScreen(0,0,0,0,$bmp.Size); $bmp.Save("_smoke_test.png", [System.Drawing.Imaging.ImageFormat]::Png); $g.Dispose(); $bmp.Dispose(); Write-Host "Screenshot saved"
+```
+Inspect `_smoke_test.png` — if you see "Crimson Racer — orbit with mouse/touch" at the bottom, the model loaded. If you see an error or spinner, check AGENT_HANDOFF.md → Smoke-Test / Screenshot Debugging.
+
 ### Live URL (GitHub Pages)
 ```
 https://stefopps.github.io/ar-heart?v=8
