@@ -65,10 +65,13 @@ git push origin master
 
 ### GLTFLoader
 
-The project uses Three.js r86 (2017). The GLTFLoader compatible with r86 is at `js/GLTFLoader.js`. If you need to re-download:
+The project uses Three.js r86 (2017). The GLTFLoader compatible with glTF 2.0 is at `js/GLTFLoader.js` (Don McCurdy rewrite, three.js r94 era). If you need to re-download:
 ```powershell
-curl.exe -s -o "js\GLTFLoader.js" "https://cdn.jsdelivr.net/npm/three@0.86.0/examples/js/loaders/GLTFLoader.js"
+# WARNING: three.js r86 CDN ships a glTF 1.0 loader (technique/shader-based).
+# For glTF 2.0 GLB files (pbrMetallicRoughness, what Meshy AI exports), use:
+curl.exe -s -o "js\GLTFLoader.js" "https://cdn.jsdelivr.net/npm/three@0.94.0/examples/js/loaders/GLTFLoader.js"
 ```
+DO NOT use the r86 CDN loader — it silently fails on glTF 2.0 files.
 
 ## Quick Start (User)
 
