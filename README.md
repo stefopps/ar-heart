@@ -63,6 +63,7 @@ AR page: `index.html`
 - **Slider double-click reset** — any slider resets to default on double-click
 - **Live settings -> AR** — light changes apply to both preview and AR simultaneously
 - **Green marker pad** — semi-transparent green circle on Hiro marker (always visible when locked)
+- **Drive animation** — loaded model glides from point A to B across the marker, turns around, and loops. Toggle "Drive: ON/OFF" in the swap bar; Speed + Distance sliders in the preview panel.
 - **Disk persistence** — settings saved to `settings.json` via `/api/settings`
 - **Model upload** — local files POST to `/api/upload-model` for persistent serving
 - **Immediate boot** — orange cube renders instantly, model loads async in background

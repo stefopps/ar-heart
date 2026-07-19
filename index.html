@@ -167,7 +167,7 @@
     #hint { bottom:16px; font-size:11px; color:rgba(255,255,255,0.7); }
   }
 </style>
-<!-- v=29: fix qUp.identity() crash (r86 Quaternion has no .identity); fetch-based GLB load -->
+<!-- v=30: car drives A↔B on the marker (toggle + speed/distance), r86-safe -->
 <script src="js/three.js"></script>
 <script src="js/GLTFLoader.js"></script>
 <script src="js/OrbitControls.js"></script>
@@ -261,6 +261,17 @@
         <button type="button" id="orientHoudiniBtn">Houdini Z-up</button>
         <button type="button" id="orientBlenderBtn">Blender Y-up</button>
       </div>
+      <div class="title" style="margin-top:10px">DRIVE ANIMATION (A ↔ B)</div>
+      <div class="row">
+        <label>Speed</label>
+        <input id="driveSpeed" type="range" min="0" max="2" step="0.05" value="0.45">
+        <span class="val" id="driveSpeedVal">0.45</span>
+      </div>
+      <div class="row">
+        <label>Distance</label>
+        <input id="driveRange" type="range" min="0.1" max="1.6" step="0.05" value="0.85">
+        <span class="val" id="driveRangeVal">0.85</span>
+      </div>
     </div>
     <div id="lightControls">
       <div class="row">
@@ -301,6 +312,7 @@
 <div id="swapBar">
   <label for="fileInput">Load local model</label>
   <input id="fileInput" type="file" accept=".glb,.gltf,model/gltf-binary,model/gltf+json">
+  <button type="button" id="driveToggleBtn">Drive: ON</button>
   <button type="button" class="secondary" id="resetCubeBtn">Reset to cube</button>
 </div>
 
@@ -342,6 +354,18 @@ var webcamEnabled = true;
 var activeModelUrl = '';
 var activeModelLabel = '';
 var _saveDiskTimer = null;
+
+// Drive animation: model glides A ↔ B across the marker and turns around at each end
+var carPivot = null;
+var carAnim = {
+  enabled: true,
+  range: 0.85,        // half-distance in marker units along X
+  speed: 0.45,        // marker units / second
+  x: 0,
+  dir: 1,
+  heading: 0,
+  targetHeading: 0
+};
 
 function isPhoneUI() {
   return window.matchMedia('(max-width: 900px)').matches;
@@ -646,6 +670,9 @@ function collectSettings() {
     modelUrl: activeModelUrl || '',
     modelLabel: activeModelLabel || '',
     webcamEnabled: !!webcamEnabled,
+    driveEnabled: !!carAnim.enabled,
+    driveSpeed: carAnim.speed,
+    driveRange: carAnim.range,
     panel: panel,
     version: 23,
     savedAt: Date.now()
@@ -664,6 +691,26 @@ function applySettingsObject(data) {
   if (data.orientPitch != null) document.getElementById('orientPitch').value = data.orientPitch;
   if (data.orientRoll != null) document.getElementById('orientRoll').value = data.orientRoll;
   if (typeof data.webcamEnabled === 'boolean') webcamEnabled = data.webcamEnabled;
+  if (typeof data.driveEnabled === 'boolean') carAnim.enabled = data.driveEnabled;
+  if (data.driveSpeed != null) {
+    carAnim.speed = Number(data.driveSpeed);
+    var dsEl = document.getElementById('driveSpeed');
+    var dsVal = document.getElementById('driveSpeedVal');
+    if (dsEl) dsEl.value = data.driveSpeed;
+    if (dsVal) dsVal.textContent = Number(data.driveSpeed).toFixed(2);
+  }
+  if (data.driveRange != null) {
+    carAnim.range = Number(data.driveRange);
+    var drEl = document.getElementById('driveRange');
+    var drVal = document.getElementById('driveRangeVal');
+    if (drEl) drEl.value = data.driveRange;
+    if (drVal) drVal.textContent = Number(data.driveRange).toFixed(2);
+  }
+  var driveBtnEl = document.getElementById('driveToggleBtn');
+  if (driveBtnEl) {
+    driveBtnEl.textContent = carAnim.enabled ? 'Drive: ON' : 'Drive: OFF';
+    driveBtnEl.className = carAnim.enabled ? '' : 'secondary';
+  }
   if (data.modelUrl) {
     activeModelUrl = data.modelUrl;
     activeModelLabel = data.modelLabel || data.modelUrl.split('/').pop();
@@ -1060,6 +1107,55 @@ function setWebcamEnabled(on) {
   setStatus(webcamEnabled ? 'Webcam on' : 'Webcam off — model still tracks if marker was locked');
 }
 
+function setDriveEnabled(on) {
+  carAnim.enabled = !!on;
+  var btn = document.getElementById('driveToggleBtn');
+  if (btn) {
+    btn.textContent = carAnim.enabled ? 'Drive: ON' : 'Drive: OFF';
+    btn.className = carAnim.enabled ? '' : 'secondary';
+  }
+  if (!carAnim.enabled && carPivot) {
+    // Park at center, facing forward
+    carAnim.x = 0;
+    carAnim.heading = 0;
+    carAnim.targetHeading = 0;
+    carPivot.position.x = 0;
+    carPivot.rotation.y = 0;
+  }
+  setStatus(carAnim.enabled
+    ? 'Drive ON — car loops from A to B on the marker'
+    : 'Drive OFF — car parked at center');
+  saveSettings({ announce: false });
+}
+
+function wireDriveControls() {
+  var btn = document.getElementById('driveToggleBtn');
+  if (btn) {
+    btn.addEventListener('click', function() { setDriveEnabled(!carAnim.enabled); });
+  }
+  var speed = document.getElementById('driveSpeed');
+  if (speed) {
+    speed.addEventListener('input', function() {
+      carAnim.speed = Number(speed.value);
+      var v = document.getElementById('driveSpeedVal');
+      if (v) v.textContent = Number(speed.value).toFixed(2);
+      saveSettings({ announce: false });
+    });
+  }
+  var range = document.getElementById('driveRange');
+  if (range) {
+    range.addEventListener('input', function() {
+      carAnim.range = Number(range.value);
+      // Keep the car inside the new range
+      if (carAnim.x > carAnim.range) carAnim.x = carAnim.range;
+      if (carAnim.x < -carAnim.range) carAnim.x = -carAnim.range;
+      var v = document.getElementById('driveRangeVal');
+      if (v) v.textContent = Number(range.value).toFixed(2);
+      saveSettings({ announce: false });
+    });
+  }
+}
+
 function setupFloatingPreview() {
   if (!shouldInitPreview()) return;
   var panel = document.getElementById('previewPanel');
@@ -1389,6 +1485,8 @@ function initialize() {
     wireSliderDoubleClickReset();
   }
 
+  wireDriveControls();  // drive button lives in swap bar (phone + desktop)
+
   applyOrientation();
   applyPreviewLightsFromUI();
 
@@ -1427,6 +1525,7 @@ function clearContent() {
     contentRoot.remove(contentRoot.children[0]);
   }
   currentContent = null;
+  carPivot = null;
   if (objectUrlToRevoke) {
     URL.revokeObjectURL(objectUrlToRevoke);
     objectUrlToRevoke = null;
@@ -1515,8 +1614,17 @@ function placeAsContent(object3d, label) {
   softenMaterials(object3d);
   fitAndPlace(object3d);
   prepareContentMeshes(object3d);
-  contentRoot.add(object3d);
+  // Wrap in a pivot so the car can drive (translate) + turn (rotate) without
+  // disturbing the centering/scale that fitAndPlace baked into object3d.
+  carPivot = new THREE.Group();
+  carPivot.add(object3d);
+  contentRoot.add(carPivot);
   currentContent = object3d;
+  // Restart the drive from center, facing forward
+  carAnim.x = 0;
+  carAnim.dir = 1;
+  carAnim.heading = 0;
+  carAnim.targetHeading = 0;
   setBadge(label || 'Loaded model');
   // Keep durable path if this load came from a normal URL (not blob:)
   if (window.__pendingModelUrl && window.__pendingModelUrl.indexOf('blob:') !== 0) {
@@ -1687,6 +1795,27 @@ function update() {
   }
 
   if (previewControls) previewControls.update();
+
+  // Drive animation: loaded model glides A ↔ B across the marker, turning at each end
+  if (carAnim.enabled && carPivot && window.__modelLoadedOk) {
+    var dt = (typeof deltaTime === 'number' && isFinite(deltaTime))
+      ? Math.min(deltaTime, 0.05)
+      : 0.016;
+    carAnim.x += carAnim.dir * carAnim.speed * dt;
+    if (carAnim.x >= carAnim.range) {
+      carAnim.x = carAnim.range;
+      carAnim.dir = -1;
+      carAnim.targetHeading = Math.PI;
+    } else if (carAnim.x <= -carAnim.range) {
+      carAnim.x = -carAnim.range;
+      carAnim.dir = 1;
+      carAnim.targetHeading = 0;
+    }
+    // Smoothly turn to face the direction of travel
+    carAnim.heading += (carAnim.targetHeading - carAnim.heading) * Math.min(1, dt * 6);
+    carPivot.position.x = carAnim.x;
+    carPivot.rotation.y = carAnim.heading;
+  }
 
   // Marker lock feedback (Hiro found ↔ content appears)
   var locked = !!(markerRoot1 && markerRoot1.visible);

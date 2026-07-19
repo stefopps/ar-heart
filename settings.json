@@ -11,7 +11,10 @@
   "modelUrl": "models/retopology.glb",
   "modelLabel": "retopology.glb",
   "webcamEnabled": true,
+  "driveEnabled": false,
+  "driveSpeed": 0.95,
+  "driveRange": 1.35,
   "panel": null,
   "version": 23,
-  "savedAt": 1784478051761
+  "savedAt": 1784478974800
 }

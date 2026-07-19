@@ -16,3 +16,6 @@ key.pem
 # Local uploaded models
 models/uploads/
 models/*.gltf.*.glb
+
+# Generated flyer PDFs (build artifacts — regenerate with _makepdf.py)
+*.pdf
