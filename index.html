@@ -96,7 +96,7 @@
   <div class="value" id="badgeValue">Hello Cube</div>
 </div>
 <div id="statusMsg"></div>
-<div id="hint">Point at Hiro marker · swipe rotate · pinch zoom · two-finger pan</div>
+<div id="hint">Point at Hiro marker · swipe rotate · pinch zoom · two-finger pan · double-tap reset</div>
 
 <div id="previewPanel">
   <header>MODEL PREVIEW <span id="previewLabel">—</span></header>
@@ -130,6 +130,7 @@
     </div>
     <div class="toggleRow">
       <button type="button" id="lightResetBtn">Reset lights</button>
+      <button type="button" id="lightSaveBtn">Save settings</button>
       <button type="button" id="lightApplyArBtn">Apply to AR</button>
     </div>
   </div>
@@ -169,6 +170,9 @@ var targetRotY = 0, targetRotX = 0;
 var currentRotY = 0, currentRotX = 0;
 var panX = 0, panY = 0;
 var targetPanX = 0, targetPanY = 0;
+var touchMoved = false;
+var lastTapAt = 0;
+var SETTINGS_KEY = 'meworld-ar-settings-v13';
 
 initialize();
 animate();
@@ -225,7 +229,8 @@ function updateLightPositions() {
   document.getElementById('lightHeightVal').textContent = fmt(height, 1);
 }
 
-function applyPreviewLightsFromUI() {
+function applyPreviewLightsFromUI(opts) {
+  opts = opts || {};
   if (!previewAmbient) return;
   var a = Number(document.getElementById('lightAmbient').value);
   var k = Number(document.getElementById('lightKey').value);
@@ -237,18 +242,64 @@ function applyPreviewLightsFromUI() {
   document.getElementById('lightKeyVal').textContent = fmt(k);
   document.getElementById('lightFillVal').textContent = fmt(f);
   updateLightPositions();
+  if (opts.persist) saveSettings();
 }
 
 function applyLightsToAR() {
   if (!arAmbient || !arKey) return;
-  arAmbient.intensity = previewAmbient.intensity;
-  arKey.intensity = previewKey.intensity;
-  arKey.position.copy(previewKey.position);
-  if (arFill) {
-    arFill.intensity = previewFill.intensity;
-    arFill.position.copy(previewFill.position);
+  // If preview exists, copy from preview; else from sliders/defaults
+  if (previewAmbient) {
+    arAmbient.intensity = previewAmbient.intensity;
+    arKey.intensity = previewKey.intensity;
+    arKey.position.copy(previewKey.position);
+    if (arFill && previewFill) {
+      arFill.intensity = previewFill.intensity;
+      arFill.position.copy(previewFill.position);
+    }
+  } else {
+    arAmbient.intensity = Number(document.getElementById('lightAmbient').value);
+    arKey.intensity = Number(document.getElementById('lightKey').value);
   }
-  setStatus('Preview lighting applied to AR scene');
+  setStatus('Lighting applied to AR');
+  saveSettings();
+}
+
+function collectSettings() {
+  return {
+    ambient: document.getElementById('lightAmbient').value,
+    key: document.getElementById('lightKey').value,
+    fill: document.getElementById('lightFill').value,
+    orbit: document.getElementById('lightOrbit').value,
+    height: document.getElementById('lightHeight').value,
+    arAmbient: arAmbient ? arAmbient.intensity : null,
+    arKey: arKey ? arKey.intensity : null,
+    savedAt: Date.now()
+  };
+}
+
+function saveSettings() {
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(collectSettings()));
+    setStatus('Settings saved on this device');
+  } catch (e) {
+    setStatus('Could not save settings (private mode?)', true);
+  }
+}
+
+function loadSettings() {
+  try {
+    var raw = localStorage.getItem(SETTINGS_KEY);
+    if (!raw) return false;
+    var data = JSON.parse(raw);
+    if (data.ambient != null) document.getElementById('lightAmbient').value = data.ambient;
+    if (data.key != null) document.getElementById('lightKey').value = data.key;
+    if (data.fill != null) document.getElementById('lightFill').value = data.fill;
+    if (data.orbit != null) document.getElementById('lightOrbit').value = data.orbit;
+    if (data.height != null) document.getElementById('lightHeight').value = data.height;
+    return true;
+  } catch (e) {
+    return false;
+  }
 }
 
 function resetLights() {
@@ -258,13 +309,42 @@ function resetLights() {
   document.getElementById('lightOrbit').value = '40';
   document.getElementById('lightHeight').value = '5.0';
   applyPreviewLightsFromUI();
+  applyLightsToAR();
+}
+
+function resetPose() {
+  targetRotY = 0;
+  targetRotX = 0;
+  currentRotY = 0;
+  currentRotX = 0;
+  targetPanX = 0;
+  targetPanY = 0;
+  panX = 0;
+  panY = 0;
+  currentScale = 1;
+  touchStartScale = 1;
+  if (touchOrbit) {
+    touchOrbit.scale.set(1, 1, 1);
+    touchOrbit.rotation.set(0, 0, 0);
+    touchOrbit.position.set(0, 0, 0);
+  }
+  setStatus('Pose reset');
 }
 
 function wireLightControls() {
   ['lightAmbient', 'lightKey', 'lightFill', 'lightOrbit', 'lightHeight'].forEach(function(id) {
-    document.getElementById(id).addEventListener('input', applyPreviewLightsFromUI);
+    document.getElementById(id).addEventListener('input', function() {
+      applyPreviewLightsFromUI();
+    });
+    document.getElementById(id).addEventListener('change', function() {
+      applyPreviewLightsFromUI({ persist: true });
+    });
   });
   document.getElementById('lightResetBtn').addEventListener('click', resetLights);
+  document.getElementById('lightSaveBtn').addEventListener('click', function() {
+    applyLightsToAR();
+    saveSettings();
+  });
   document.getElementById('lightApplyArBtn').addEventListener('click', applyLightsToAR);
 }
 
@@ -374,6 +454,7 @@ function setupTouchControls() {
   canvas.addEventListener('touchstart', function(e) {
     e.preventDefault();
     isTouching = true;
+    touchMoved = false;
     if (e.touches.length === 1) {
       touchLastX = e.touches[0].clientX;
       touchLastY = e.touches[0].clientY;
@@ -392,12 +473,14 @@ function setupTouchControls() {
     if (e.touches.length === 1 && isTouching) {
       var dx = e.touches[0].clientX - touchLastX;
       var dy = e.touches[0].clientY - touchLastY;
+      if (Math.abs(dx) + Math.abs(dy) > 6) touchMoved = true;
       targetRotY += dx * 0.005;
       targetRotX += dy * 0.005;
       targetRotX = Math.max(-Math.PI / 2.5, Math.min(Math.PI / 2.5, targetRotX));
       touchLastX = e.touches[0].clientX;
       touchLastY = e.touches[0].clientY;
     } else if (e.touches.length === 2) {
+      touchMoved = true;
       var dx2 = e.touches[0].clientX - e.touches[1].clientX;
       var dy2 = e.touches[0].clientY - e.touches[1].clientY;
       var dist = Math.sqrt(dx2 * dx2 + dy2 * dy2);
@@ -405,7 +488,6 @@ function setupTouchControls() {
         currentScale = Math.max(0.25, Math.min(4.0, touchStartScale * (dist / touchStartDistance)));
         touchOrbit.scale.setScalar(currentScale);
       }
-      // two-finger pan
       var mx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
       var my = (e.touches[0].clientY + e.touches[1].clientY) / 2;
       targetPanX += (mx - touchLastX) * 0.002;
@@ -419,13 +501,25 @@ function setupTouchControls() {
     if (e.touches.length === 0) {
       isTouching = false;
       touchStartDistance = 0;
+      // Double-tap (no drag) resets pose to original
+      var now = Date.now();
+      if (!touchMoved && (now - lastTapAt) < 320) {
+        resetPose();
+        lastTapAt = 0;
+      } else if (!touchMoved) {
+        lastTapAt = now;
+      } else {
+        lastTapAt = 0;
+      }
     }
   });
 
-  // Desktop drag / wheel on AR canvas
   var mouseDown = false;
+  var mouseMoved = false;
+  var lastClickAt = 0;
   canvas.addEventListener('mousedown', function(e) {
     mouseDown = true;
+    mouseMoved = false;
     touchLastX = e.clientX;
     touchLastY = e.clientY;
   });
@@ -433,13 +527,20 @@ function setupTouchControls() {
     if (!mouseDown) return;
     var dx = e.clientX - touchLastX;
     var dy = e.clientY - touchLastY;
+    if (Math.abs(dx) + Math.abs(dy) > 4) mouseMoved = true;
     targetRotY += dx * 0.005;
     targetRotX += dy * 0.005;
     targetRotX = Math.max(-Math.PI / 2.5, Math.min(Math.PI / 2.5, targetRotX));
     touchLastX = e.clientX;
     touchLastY = e.clientY;
   });
-  canvas.addEventListener('mouseup', function() { mouseDown = false; });
+  canvas.addEventListener('mouseup', function() {
+    mouseDown = false;
+  });
+  canvas.addEventListener('dblclick', function(e) {
+    e.preventDefault();
+    resetPose();
+  });
   canvas.addEventListener('wheel', function(e) {
     e.preventDefault();
     currentScale = Math.max(0.25, Math.min(4.0, currentScale - e.deltaY * 0.001));
@@ -536,7 +637,25 @@ function initialize() {
   contentRoot = new THREE.Group();
   touchOrbit.add(contentRoot);
 
+  // Restore saved lighting (per-browser / per-phone localStorage)
+  loadSettings();
   initPreview();
+  // Push slider values into AR lights (quiet — no status toast)
+  if (previewAmbient) {
+    applyPreviewLightsFromUI();
+    arAmbient.intensity = previewAmbient.intensity;
+    arKey.intensity = previewKey.intensity;
+    arKey.position.copy(previewKey.position);
+    if (arFill && previewFill) {
+      arFill.intensity = previewFill.intensity;
+      arFill.position.copy(previewFill.position);
+    }
+  } else {
+    arAmbient.intensity = Number(document.getElementById('lightAmbient').value);
+    arKey.intensity = Number(document.getElementById('lightKey').value);
+    if (arFill) arFill.intensity = Number(document.getElementById('lightFill').value);
+  }
+
   showCube();
 
   if (MODEL_URL) {
