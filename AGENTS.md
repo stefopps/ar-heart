@@ -2,6 +2,25 @@
 
 Single-file Three.js + AR.js app. One JS error = black screen, zero visible feedback. Be paranoid.
 
+## Known-good revert points (if you break it, roll back here)
+
+| Tag | Commit | State |
+|-----|--------|-------|
+| `v29-stable` | `49b003b` | Car model loads reliably on marker + preview. Last verified stable. |
+
+Roll back everything to the last stable state:
+```
+git reset --hard v29-stable
+```
+Preview a stable file without resetting:
+```
+git checkout v29-stable -- index.html
+```
+List all stable points:
+```
+git tag
+```
+
 ## File map
 
 | File | Role | Risk |
