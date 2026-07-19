@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <title>MeWorld AR — Hello Cube</title>
 <style>
-  html, body { margin:0; padding:0; overflow:hidden; background:#000; font-family:system-ui,sans-serif; }
+  html, body { margin:0; padding:0; overflow:hidden; background:#000; font-family:system-ui,sans-serif; touch-action:none; }
   #badge {
     position:fixed; top:12px; left:12px; z-index:10;
     background:rgba(10,10,20,0.85); border:1px solid rgba(255,255,255,0.1);
@@ -15,8 +15,9 @@
   #badge .label { color:#888; font-size:9px; text-transform:uppercase; letter-spacing:1px; }
   #badge .value { color:#e0e0e0; font-weight:600; font-size:13px; max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   #hint {
-    position:fixed; bottom:24px; left:50%; transform:translateX(-50%); z-index:10;
+    position:fixed; bottom:20px; left:50%; transform:translateX(-50%); z-index:10;
     color:#888; font-size:12px; text-align:center; pointer-events:none;
+    max-width:90vw; line-height:1.45;
   }
   #swapBar {
     position:fixed; bottom:56px; left:50%; transform:translateX(-50%); z-index:20;
@@ -45,7 +46,11 @@
     color:#ff6600; font-size:11px; font-weight:600; letter-spacing:0.4px;
   }
   #previewPanel header span { color:#666; font-weight:400; font-size:10px; }
-  #previewCanvasWrap { width:100%; height:200px; cursor:grab; }
+  #previewAxisHint {
+    padding:4px 10px 0; color:#8f8; font-size:10px; letter-spacing:0.3px;
+  }
+  #previewAxisHint b { color:#00ff88; }
+  #previewCanvasWrap { width:100%; height:200px; cursor:grab; position:relative; }
   #previewCanvasWrap:active { cursor:grabbing; }
   #lightControls {
     padding:8px 10px 10px; border-top:1px solid rgba(255,255,255,0.08);
@@ -63,12 +68,16 @@
     border-radius:6px; padding:6px 8px; font-size:10px; cursor:pointer;
   }
   #lightControls button:hover { background:rgba(255,102,0,0.25); color:#fff; }
-  @media (max-width: 600px) {
-    #previewPanel { width:46vw; top:auto; bottom:100px; right:8px; }
-    #previewCanvasWrap { height:140px; }
+
+  /* Phone: hide desktop preview tooling — AR + touch only */
+  @media (max-width: 900px), (hover: none) and (pointer: coarse) {
+    #previewPanel { display:none !important; }
+    #swapBar { bottom:72px; }
+    #swapBar label, #swapBar button { padding:8px 12px; font-size:12px; }
+    #hint { bottom:16px; font-size:11px; color:rgba(255,255,255,0.7); }
   }
 </style>
-<!-- v=12: cube + GLB swap + side model preview -->
+<!-- v=13: phone AR touch + lit materials + desktop preview UP axis -->
 <script src="js/three.js"></script>
 <script src="js/GLTFLoader.js"></script>
 <script src="js/OrbitControls.js"></script>
@@ -87,26 +96,27 @@
   <div class="value" id="badgeValue">Hello Cube</div>
 </div>
 <div id="statusMsg"></div>
-<div id="hint">Point camera at the Hiro marker on the flyer</div>
+<div id="hint">Point at Hiro marker · swipe rotate · pinch zoom · two-finger pan</div>
 
 <div id="previewPanel">
   <header>MODEL PREVIEW <span id="previewLabel">—</span></header>
+  <div id="previewAxisHint"><b>GREEN = UP</b> (Y+) — same up on phone AR</div>
   <div id="previewCanvasWrap"></div>
   <div id="lightControls">
     <div class="row">
       <label>Ambient</label>
-      <input id="lightAmbient" type="range" min="0" max="2" step="0.05" value="0.75">
-      <span class="val" id="lightAmbientVal">0.75</span>
+      <input id="lightAmbient" type="range" min="0" max="3" step="0.05" value="1.20">
+      <span class="val" id="lightAmbientVal">1.20</span>
     </div>
     <div class="row">
       <label>Key</label>
-      <input id="lightKey" type="range" min="0" max="3" step="0.05" value="1.00">
-      <span class="val" id="lightKeyVal">1.00</span>
+      <input id="lightKey" type="range" min="0" max="4" step="0.05" value="1.80">
+      <span class="val" id="lightKeyVal">1.80</span>
     </div>
     <div class="row">
       <label>Fill</label>
-      <input id="lightFill" type="range" min="0" max="2" step="0.05" value="0.35">
-      <span class="val" id="lightFillVal">0.35</span>
+      <input id="lightFill" type="range" min="0" max="2" step="0.05" value="0.60">
+      <span class="val" id="lightFillVal">0.60</span>
     </div>
     <div class="row">
       <label>Orbit Y</label>
@@ -131,36 +141,41 @@
   <button type="button" class="secondary" id="resetCubeBtn">Reset to cube</button>
 </div>
 
-<!--
-  Cube by default. Swap with:
-  1) Set MODEL_URL below to e.g. 'models/retopology.glb'
-  2) Or tap "Load local model" and pick a .glb from disk
-  Archive racer: branch archive/v10-crimson-racer
--->
-
 <script>
 // ============================================================
 // SWAP CONFIG — leave empty for cube, or point at a file under /models
-// Example: var MODEL_URL = 'models/retopology.glb';
-// NOTE: Houdini .glb that starts with PGEO is NOT glTF — export as
-// real glTF Binary, or convert the .obj (see models/retopology.glb).
 // ============================================================
 var MODEL_URL = 'models/retopology.glb';
 
 var scene, camera, renderer, clock, deltaTime, totalTime;
 var arToolkitSource, arToolkitContext, smoothedControls;
 var markerRoot1;
+var touchOrbit;      // user rotate / pinch / pan
 var contentRoot;     // holds either cube or loaded model
-var currentContent;  // the active mesh/group
+var currentContent;
 var objectUrlToRevoke = null;
 
-// Side preview (always visible — proves model loaded without AR marker)
 var previewScene, previewCamera, previewRenderer, previewControls, previewRoot;
 var previewAmbient, previewKey, previewFill;
-var arAmbient, arKey;
+var arAmbient, arKey, arFill, arHemi;
+
+// Touch interaction state
+var isTouching = false;
+var touchLastX = 0, touchLastY = 0;
+var touchStartDistance = 0;
+var touchStartScale = 1;
+var currentScale = 1;
+var targetRotY = 0, targetRotX = 0;
+var currentRotY = 0, currentRotX = 0;
+var panX = 0, panY = 0;
+var targetPanX = 0, targetPanY = 0;
 
 initialize();
 animate();
+
+function isPhoneUI() {
+  return window.matchMedia('(max-width: 900px), (hover: none) and (pointer: coarse)').matches;
+}
 
 function setStatus(msg, isError) {
   var el = document.getElementById('statusMsg');
@@ -170,11 +185,32 @@ function setStatus(msg, isError) {
 
 function setBadge(name) {
   document.getElementById('badgeValue').textContent = name;
-  document.getElementById('previewLabel').textContent = name;
+  var pl = document.getElementById('previewLabel');
+  if (pl) pl.textContent = name;
 }
 
 function fmt(n, d) {
   return Number(n).toFixed(d === undefined ? 2 : d);
+}
+
+/** Soften PBR so models aren't black without an env map (preview + AR). */
+function softenMaterials(root) {
+  root.traverse(function(obj) {
+    if (!obj.isMesh || !obj.material) return;
+    var mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+    for (var i = 0; i < mats.length; i++) {
+      var m = mats[i];
+      if (!m) continue;
+      m = m.clone();
+      mats[i] = m;
+      if (m.metalness !== undefined) m.metalness = Math.min(m.metalness, 0.2);
+      if (m.roughness !== undefined) m.roughness = Math.max(m.roughness, 0.4);
+      if (m.color && m.color.getHex() === 0x000000) m.color.setHex(0x999999);
+      if (m.side !== undefined) m.side = THREE.DoubleSide;
+      m.needsUpdate = true;
+    }
+    obj.material = Array.isArray(obj.material) ? mats : mats[0];
+  });
 }
 
 function updateLightPositions() {
@@ -208,13 +244,17 @@ function applyLightsToAR() {
   arAmbient.intensity = previewAmbient.intensity;
   arKey.intensity = previewKey.intensity;
   arKey.position.copy(previewKey.position);
+  if (arFill) {
+    arFill.intensity = previewFill.intensity;
+    arFill.position.copy(previewFill.position);
+  }
   setStatus('Preview lighting applied to AR scene');
 }
 
 function resetLights() {
-  document.getElementById('lightAmbient').value = '0.75';
-  document.getElementById('lightKey').value = '1.00';
-  document.getElementById('lightFill').value = '0.35';
+  document.getElementById('lightAmbient').value = '1.20';
+  document.getElementById('lightKey').value = '1.80';
+  document.getElementById('lightFill').value = '0.60';
   document.getElementById('lightOrbit').value = '40';
   document.getElementById('lightHeight').value = '5.0';
   applyPreviewLightsFromUI();
@@ -229,6 +269,9 @@ function wireLightControls() {
 }
 
 function initPreview() {
+  // Skip heavy preview GL on pure phone UI
+  if (isPhoneUI()) return;
+
   var wrap = document.getElementById('previewCanvasWrap');
   var w = wrap.clientWidth || 260;
   var h = wrap.clientHeight || 200;
@@ -244,23 +287,33 @@ function initPreview() {
   previewRenderer.setSize(w, h);
   wrap.appendChild(previewRenderer.domElement);
 
-  previewAmbient = new THREE.AmbientLight(0xffffff, 0.75);
+  previewAmbient = new THREE.AmbientLight(0xffffff, 1.2);
   previewScene.add(previewAmbient);
+  previewScene.add(new THREE.HemisphereLight(0xffffff, 0x444466, 0.7));
 
-  var hemi = new THREE.HemisphereLight(0xffffff, 0x444466, 0.55);
-  previewScene.add(hemi);
-
-  previewKey = new THREE.DirectionalLight(0xffffff, 1.0);
+  previewKey = new THREE.DirectionalLight(0xffffff, 1.8);
   previewKey.position.set(3, 5, 2);
   previewScene.add(previewKey);
 
-  previewFill = new THREE.DirectionalLight(0x8899ff, 0.35);
+  previewFill = new THREE.DirectionalLight(0x8899ff, 0.6);
   previewFill.position.set(-2, 1, -2);
   previewScene.add(previewFill);
 
   var grid = new THREE.GridHelper(2, 8, 0x444455, 0x2a2a35);
-  grid.position.y = 0;
   previewScene.add(grid);
+
+  // Axes: X red, Y green (UP), Z blue — plus a tall UP arrow
+  var axes = new THREE.AxesHelper(1.15);
+  previewScene.add(axes);
+  var upArrow = new THREE.ArrowHelper(
+    new THREE.Vector3(0, 1, 0),
+    new THREE.Vector3(0, 0, 0),
+    1.35,
+    0x00ff88,
+    0.18,
+    0.1
+  );
+  previewScene.add(upArrow);
 
   previewRoot = new THREE.Group();
   previewScene.add(previewRoot);
@@ -296,29 +349,10 @@ function syncPreviewFromContent() {
   }
 
   var clone = currentContent.clone(true);
-  // Normalize independently of AR placement so preview stays readable
   clone.position.set(0, 0, 0);
   clone.rotation.set(0, 0, 0);
   clone.scale.set(1, 1, 1);
-
-  // glTF with metalness=1 looks black without an env map — soften for preview readability
-  clone.traverse(function(obj) {
-    if (!obj.isMesh || !obj.material) return;
-    var mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-    for (var i = 0; i < mats.length; i++) {
-      var m = mats[i];
-      if (!m) continue;
-      // clone material so AR content stays untouched
-      m = m.clone();
-      mats[i] = m;
-      if (m.metalness !== undefined) m.metalness = Math.min(m.metalness, 0.25);
-      if (m.roughness !== undefined) m.roughness = Math.max(m.roughness, 0.35);
-      if (m.color && m.color.getHex() === 0x000000) m.color.setHex(0x888888);
-      m.needsUpdate = true;
-    }
-    obj.material = Array.isArray(obj.material) ? mats : mats[0];
-  });
-
+  softenMaterials(clone);
   previewRoot.add(clone);
 
   var box = new THREE.Box3().setFromObject(clone);
@@ -334,28 +368,117 @@ function syncPreviewFromContent() {
   previewControls.update();
 }
 
+function setupTouchControls() {
+  var canvas = renderer.domElement;
+
+  canvas.addEventListener('touchstart', function(e) {
+    e.preventDefault();
+    isTouching = true;
+    if (e.touches.length === 1) {
+      touchLastX = e.touches[0].clientX;
+      touchLastY = e.touches[0].clientY;
+    } else if (e.touches.length === 2) {
+      var dx = e.touches[0].clientX - e.touches[1].clientX;
+      var dy = e.touches[0].clientY - e.touches[1].clientY;
+      touchStartDistance = Math.sqrt(dx * dx + dy * dy);
+      touchStartScale = currentScale;
+      touchLastX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      touchLastY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+    }
+  }, { passive: false });
+
+  canvas.addEventListener('touchmove', function(e) {
+    e.preventDefault();
+    if (e.touches.length === 1 && isTouching) {
+      var dx = e.touches[0].clientX - touchLastX;
+      var dy = e.touches[0].clientY - touchLastY;
+      targetRotY += dx * 0.005;
+      targetRotX += dy * 0.005;
+      targetRotX = Math.max(-Math.PI / 2.5, Math.min(Math.PI / 2.5, targetRotX));
+      touchLastX = e.touches[0].clientX;
+      touchLastY = e.touches[0].clientY;
+    } else if (e.touches.length === 2) {
+      var dx2 = e.touches[0].clientX - e.touches[1].clientX;
+      var dy2 = e.touches[0].clientY - e.touches[1].clientY;
+      var dist = Math.sqrt(dx2 * dx2 + dy2 * dy2);
+      if (touchStartDistance > 0) {
+        currentScale = Math.max(0.25, Math.min(4.0, touchStartScale * (dist / touchStartDistance)));
+        touchOrbit.scale.setScalar(currentScale);
+      }
+      // two-finger pan
+      var mx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      var my = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      targetPanX += (mx - touchLastX) * 0.002;
+      targetPanY -= (my - touchLastY) * 0.002;
+      touchLastX = mx;
+      touchLastY = my;
+    }
+  }, { passive: false });
+
+  canvas.addEventListener('touchend', function(e) {
+    if (e.touches.length === 0) {
+      isTouching = false;
+      touchStartDistance = 0;
+    }
+  });
+
+  // Desktop drag / wheel on AR canvas
+  var mouseDown = false;
+  canvas.addEventListener('mousedown', function(e) {
+    mouseDown = true;
+    touchLastX = e.clientX;
+    touchLastY = e.clientY;
+  });
+  canvas.addEventListener('mousemove', function(e) {
+    if (!mouseDown) return;
+    var dx = e.clientX - touchLastX;
+    var dy = e.clientY - touchLastY;
+    targetRotY += dx * 0.005;
+    targetRotX += dy * 0.005;
+    targetRotX = Math.max(-Math.PI / 2.5, Math.min(Math.PI / 2.5, targetRotX));
+    touchLastX = e.clientX;
+    touchLastY = e.clientY;
+  });
+  canvas.addEventListener('mouseup', function() { mouseDown = false; });
+  canvas.addEventListener('wheel', function(e) {
+    e.preventDefault();
+    currentScale = Math.max(0.25, Math.min(4.0, currentScale - e.deltaY * 0.001));
+    touchOrbit.scale.setScalar(currentScale);
+  }, { passive: false });
+}
+
 function initialize() {
   scene = new THREE.Scene();
 
-  arAmbient = new THREE.AmbientLight(0xcccccc, 0.7);
+  // Stronger default AR lighting so PBR models aren't black on phone
+  arAmbient = new THREE.AmbientLight(0xffffff, 1.25);
   scene.add(arAmbient);
-  arKey = new THREE.DirectionalLight(0xffffff, 1.0);
-  arKey.position.set(2, 4, 3);
+  arHemi = new THREE.HemisphereLight(0xffffff, 0x556677, 0.85);
+  scene.add(arHemi);
+  arKey = new THREE.DirectionalLight(0xffffff, 1.8);
+  arKey.position.set(3, 6, 4);
   scene.add(arKey);
+  arFill = new THREE.DirectionalLight(0xffeedd, 0.7);
+  arFill.position.set(-4, 2, -2);
+  scene.add(arFill);
 
   camera = new THREE.Camera();
   scene.add(camera);
 
   renderer = new THREE.WebGLRenderer({
     antialias: true,
-    alpha: true
+    alpha: true,
+    powerPreference: 'high-performance'
   });
   renderer.setClearColor(new THREE.Color('lightgrey'), 0);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2.5));
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.domElement.style.position = 'absolute';
   renderer.domElement.style.top = '0px';
   renderer.domElement.style.left = '0px';
   document.body.appendChild(renderer.domElement);
+
+  setupTouchControls();
 
   clock = new THREE.Clock();
   deltaTime = 0;
@@ -371,6 +494,7 @@ function initialize() {
     if (arToolkitContext.arController !== null) {
       arToolkitSource.copySizeTo(arToolkitContext.arController.canvas);
     }
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2.5));
   }
 
   arToolkitSource.init(function onReady() {
@@ -390,7 +514,6 @@ function initialize() {
     camera.projectionMatrix.copy(arToolkitContext.getProjectionMatrix());
   });
 
-  // Stemkoski hierarchy: markerRoot and smoothedRoot are siblings
   markerRoot1 = new THREE.Group();
   scene.add(markerRoot1);
 
@@ -407,13 +530,15 @@ function initialize() {
     lerpScale: 1
   });
 
+  touchOrbit = new THREE.Group();
+  smoothedRoot.add(touchOrbit);
+
   contentRoot = new THREE.Group();
-  smoothedRoot.add(contentRoot);
+  touchOrbit.add(contentRoot);
 
   initPreview();
   showCube();
 
-  // Optional auto-load from models/ path
   if (MODEL_URL) {
     loadModelFromUrl(MODEL_URL, MODEL_URL.split('/').pop());
   }
@@ -453,7 +578,9 @@ function showCube() {
   currentContent = cube;
 
   setBadge('Hello Cube');
-  setStatus('Placeholder cube — load a local .glb to replace it');
+  setStatus(isPhoneUI()
+    ? 'Cube ready — point at marker, then swipe / pinch'
+    : 'Placeholder cube — load a local .glb to replace it');
   syncPreviewFromContent();
 }
 
@@ -467,7 +594,6 @@ function fitAndPlace(object3d) {
     throw new Error('Model has empty bounding box');
   }
 
-  // Match the ~1 unit cube scale
   var scale = 1.0 / maxDim;
   object3d.scale.setScalar(scale);
   object3d.position.x = -center.x * scale;
@@ -477,6 +603,7 @@ function fitAndPlace(object3d) {
 
 function placeAsContent(object3d, label) {
   clearContent();
+  softenMaterials(object3d);
   fitAndPlace(object3d);
   contentRoot.add(object3d);
   currentContent = object3d;
@@ -496,7 +623,7 @@ function loadModelFromUrl(url, label) {
       }
       try {
         placeAsContent(gltf.scene, label || 'Model');
-        setStatus('Replaced cube with ' + (label || url));
+        setStatus('Loaded ' + (label || url) + (isPhoneUI() ? ' — swipe / pinch to move' : ''));
       } catch (e) {
         setStatus(String(e.message || e), true);
         showCube();
@@ -510,7 +637,7 @@ function loadModelFromUrl(url, label) {
     },
     function(err) {
       console.error('[AR] GLB load error:', err);
-      setStatus('Failed to load model — need real glTF (.glb starting with "glTF"). Houdini PGEO .glb will not work.', true);
+      setStatus('Failed to load model — need real glTF (.glb).', true);
     }
   );
 }
@@ -526,14 +653,13 @@ function onLocalFilePicked(e) {
     return;
   }
 
-  // Preflight header of .glb files (real glTF starts with "glTF")
   if (name.endsWith('.glb')) {
     var headerReader = new FileReader();
     headerReader.onload = function() {
       var u8 = new Uint8Array(headerReader.result);
       var magic = String.fromCharCode(u8[0], u8[1], u8[2], u8[3]);
       if (magic !== 'glTF') {
-        setStatus('Not a glTF file (header "' + magic + '"). Houdini geo named .glb is often PGEO. Convert the .obj or export glTF Binary.', true);
+        setStatus('Not a glTF file (header "' + magic + '"). Convert OBJ or export glTF Binary.', true);
         e.target.value = '';
         return;
       }
@@ -561,6 +687,19 @@ function update() {
     arToolkitContext.update(arToolkitSource.domElement);
   }
   smoothedControls.update(markerRoot1);
+
+  currentRotY += (targetRotY - currentRotY) * 0.15;
+  currentRotX += (targetRotX - currentRotX) * 0.15;
+  panX += (targetPanX - panX) * 0.15;
+  panY += (targetPanY - panY) * 0.15;
+
+  if (touchOrbit) {
+    touchOrbit.rotation.y = currentRotY;
+    touchOrbit.rotation.x = currentRotX;
+    touchOrbit.position.x = panX;
+    touchOrbit.position.y = panY;
+  }
+
   if (previewControls) previewControls.update();
 }
 
