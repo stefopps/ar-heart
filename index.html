@@ -34,6 +34,13 @@
     color:#aaa; font-size:11px; max-width:70vw; pointer-events:none;
   }
   #statusMsg.error { color:#ff5555; }
+  #trackHud {
+    position:fixed; top:72px; left:12px; z-index:10;
+    color:#666; font-size:10px; pointer-events:none;
+  }
+  #trackHud.on { color:#0f8; }
+  #trackHud.warn { color:#f80; }
+  #trackHud span { margin-right:8px; }
   #previewPanel {
     position:fixed; top:12px; right:12px; z-index:25;
     width:340px; height:560px;
@@ -167,7 +174,7 @@
     #hint { bottom:16px; font-size:11px; color:rgba(255,255,255,0.7); }
   }
 </style>
-<!-- v=31: crimson racer FBX→GLB with embedded PBR textures; textured preview -->
+<!-- v=32: tracking HUD + persistence (minConfidence↓, minUnvisibleDelay↑, confidence-weighted lerp) -->
 <script src="js/three.js"></script>
 <script src="js/GLTFLoader.js"></script>
 <script src="js/OrbitControls.js"></script>
@@ -186,6 +193,11 @@
   <div class="value" id="badgeValue">Hello Cube</div>
 </div>
 <div id="statusMsg"></div>
+<div id="trackHud" style="display:none">
+  <span id="trackCf">cf: —</span>
+  <span id="trackLost">|</span>
+  <span id="trackDelta">Δ: —</span>
+</div>
 <div id="hint">Point at Hiro · green pad = locked · lights/orient auto-apply to AR · swipe rotate · pinch zoom</div>
 
 <div id="phoneOrient">
@@ -365,6 +377,19 @@ var carAnim = {
   dir: 1,
   heading: 0,
   targetHeading: 0
+};
+
+// Tracking quality monitoring + persistence (Phase A+B)
+var trackInfo = {
+  cfPatt: 0,
+  lastCf: 0,
+  lastPoseAt: 0,
+  lastLostAt: 0,
+  wasLocked: false,
+  posDelta: 0,
+  rotDelta: 0,
+  lastPos: new THREE.Vector3(),
+  lastQuat: new THREE.Quaternion()
 };
 
 function isPhoneUI() {
@@ -1156,6 +1181,42 @@ function wireDriveControls() {
   }
 }
 
+function updateTrackerHUD() {
+  var hud = document.getElementById('trackHud');
+  var cfEl = document.getElementById('trackCf');
+  var lostEl = document.getElementById('trackLost');
+  var deltaEl = document.getElementById('trackDelta');
+  if (!hud || !cfEl || !lostEl || !deltaEl) return;
+
+  var locked = !!(markerRoot1 && markerRoot1.visible);
+  var now = performance.now();
+  var lostMs = locked ? 0 : (now - trackInfo.lastLostAt);
+  var holdMs = (smoothedControls && smoothedControls.parameters)
+    ? Math.round(smoothedControls.parameters.minUnvisibleDelay * 1000)
+    : 1000;
+
+  // Only show HUD when we have tracking data
+  if (trackInfo.lastPoseAt > 0 || locked) {
+    hud.style.display = '';
+    cfEl.textContent = locked
+      ? 'cf: ' + (trackInfo.lastCf >= 0.8 ? '● ' : trackInfo.lastCf >= 0.5 ? '◐ ' : '○ ') + trackInfo.lastCf.toFixed(2)
+      : 'cf: —';
+    lostEl.textContent = locked
+      ? '| locked'
+      : '| lost ' + Math.round(lostMs / 100) / 10 + 's (hold ' + holdMs + 'ms)';
+    deltaEl.textContent = locked
+      ? 'Δ: ' + trackInfo.posDelta.toFixed(3)
+      : 'Δ: —';
+
+    // Color: green = locked + healthy, orange = locked but low confidence, red = lost near timeout
+    hud.className = locked
+      ? (trackInfo.lastCf >= 0.55 ? 'on' : 'warn')
+      : (lostMs < holdMs ? 'warn' : '');
+  } else {
+    hud.style.display = 'none';
+  }
+}
+
 function setupFloatingPreview() {
   if (!shouldInitPreview()) return;
   var panel = document.getElementById('previewPanel');
@@ -1424,24 +1485,54 @@ function initialize() {
     detectionMode: 'mono'
   });
 
-  arToolkitContext.init(function onCompleted() {
-    camera.projectionMatrix.copy(arToolkitContext.getProjectionMatrix());
-  });
-
   markerRoot1 = new THREE.Group();
   scene.add(markerRoot1);
 
   new THREEx.ArMarkerControls(arToolkitContext, markerRoot1, {
     type: 'pattern',
-    patternUrl: 'data/hiro.patt'
+    patternUrl: 'data/hiro.patt',
+    minConfidence: 0.4   // lower gate → fewer frames thrown away at bad angles
+  });
+
+  // Capture tracking quality per frame (confidence + pose delta)
+  arToolkitContext.init(function onCompleted() {
+    camera.projectionMatrix.copy(arToolkitContext.getProjectionMatrix());
+    // Hook ARToolkit's getMarker event to record cfPatt + pose jitter
+    var ac = arToolkitContext.arController;
+    if (ac) {
+      ac.addEventListener('getMarker', function(ev) {
+        if (ev && ev.data && typeof ev.data.marker !== 'undefined') {
+          var m = ev.data.marker;
+          // Only track our Hiro pattern
+          if (m.cfPatt != null) {
+            trackInfo.lastCf = m.cfPatt;
+            if (m.cfPatt > trackInfo.cfPatt) trackInfo.cfPatt = m.cfPatt;
+            trackInfo.lastPoseAt = performance.now();
+            // Pose delta vs last frame (how much the raw detection moves)
+            if (ev.data.matrix) {
+              var tmpM = new THREE.Matrix4().fromArray(ev.data.matrix);
+              var tmpP = new THREE.Vector3();
+              var tmpQ = new THREE.Quaternion();
+              tmpM.decompose(tmpP, tmpQ, new THREE.Vector3());
+              trackInfo.posDelta = tmpP.distanceTo(trackInfo.lastPos);
+              trackInfo.rotDelta = trackInfo.lastQuat.angleTo(tmpQ);
+              trackInfo.lastPos.copy(tmpP);
+              trackInfo.lastQuat.copy(tmpQ);
+            }
+          }
+        }
+      });
+    }
   });
 
   var smoothedRoot = new THREE.Group();
   scene.add(smoothedRoot);
   smoothedControls = new THREEx.ArSmoothedControls(smoothedRoot, {
-    lerpPosition: 0.8,
-    lerpQuaternion: 0.8,
-    lerpScale: 1
+    lerpPosition: 0.3,      // softer follow (was 0.8) — flies across screen slower
+    lerpQuaternion: 0.2,    // Stemkoski default (was 0.8) — 4× less spin on jitter
+    lerpScale: 0.7,         // Stemkoski default (was 1)
+    minUnvisibleDelay: 1.0, // persist last good pose for 1s (was 0.2)
+    minVisibleDelay: 0.15   // anti-flash: must be detected 150ms before showing
   });
 
   touchOrbit = new THREE.Group();
@@ -1773,6 +1864,15 @@ function update() {
       arToolkitContext.update(arToolkitSource.domElement);
     }
     if (smoothedControls && markerRoot1) {
+      // Confidence-weighted adaptive lerp: follow tightly on high-confidence frames,
+      // barely move on low-confidence frames to filter out jitter
+      if (markerRoot1.visible && trackInfo.lastCf > 0) {
+        var cf = trackInfo.lastCf;
+        var basePos = cf >= 0.7 ? 0.35 : cf >= 0.5 ? 0.25 : 0.15;   // slower on weak frames
+        var baseQuat = cf >= 0.7 ? 0.25 : cf >= 0.5 ? 0.18 : 0.10;
+        smoothedControls.parameters.lerpPosition = basePos;
+        smoothedControls.parameters.lerpQuaternion = baseQuat;
+      }
       smoothedControls.update(markerRoot1);
     }
   } catch (err) {
@@ -1837,6 +1937,17 @@ function update() {
         : ('Point at Hiro — orange cube until model loads (' + (activeModelLabel || MODEL_URL || '?') + ')'));
     }
   }
+
+  // Tracking persistence: track when marker was last lost, apply confidence decay
+  if (!locked && trackInfo.lastPoseAt > 0) {
+    if (trackInfo.lastLostAt === 0) trackInfo.lastLostAt = performance.now();
+    // Decay confidence slowly while lost (so adaptive lerp doesn't jump on re-lock)
+    trackInfo.lastCf = Math.max(0, trackInfo.lastCf - 0.03);
+  } else if (locked) {
+    trackInfo.lastLostAt = 0;
+  }
+
+  updateTrackerHUD();
 }
 
 function render() {
