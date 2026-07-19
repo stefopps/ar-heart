@@ -13,14 +13,65 @@
     border-radius:10px; padding:6px 12px; pointer-events:none;
   }
   #badge .label { color:#888; font-size:9px; text-transform:uppercase; letter-spacing:1px; }
-  #badge .value { color:#e0e0e0; font-weight:600; font-size:13px; }
+  #badge .value { color:#e0e0e0; font-weight:600; font-size:13px; max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   #hint {
     position:fixed; bottom:24px; left:50%; transform:translateX(-50%); z-index:10;
     color:#888; font-size:12px; text-align:center; pointer-events:none;
   }
+  #swapBar {
+    position:fixed; bottom:56px; left:50%; transform:translateX(-50%); z-index:20;
+    display:flex; gap:8px; align-items:center;
+  }
+  #swapBar button, #swapBar label {
+    background:#ff6600; color:#000; border:none; border-radius:8px;
+    padding:10px 14px; font-weight:600; font-size:13px; cursor:pointer;
+  }
+  #swapBar button.secondary { background:rgba(255,255,255,0.12); color:#e0e0e0; }
+  #fileInput { display:none; }
+  #statusMsg {
+    position:fixed; top:56px; left:12px; z-index:10;
+    color:#aaa; font-size:11px; max-width:70vw; pointer-events:none;
+  }
+  #statusMsg.error { color:#ff5555; }
+  #previewPanel {
+    position:fixed; top:12px; right:12px; z-index:25;
+    width:min(300px, 46vw);
+    background:rgba(10,10,20,0.92); border:1px solid rgba(255,102,0,0.35);
+    border-radius:12px; overflow:hidden; box-shadow:0 8px 28px rgba(0,0,0,0.45);
+  }
+  #previewPanel header {
+    display:flex; justify-content:space-between; align-items:center;
+    padding:8px 10px; border-bottom:1px solid rgba(255,255,255,0.08);
+    color:#ff6600; font-size:11px; font-weight:600; letter-spacing:0.4px;
+  }
+  #previewPanel header span { color:#666; font-weight:400; font-size:10px; }
+  #previewCanvasWrap { width:100%; height:200px; cursor:grab; }
+  #previewCanvasWrap:active { cursor:grabbing; }
+  #lightControls {
+    padding:8px 10px 10px; border-top:1px solid rgba(255,255,255,0.08);
+    display:flex; flex-direction:column; gap:6px;
+  }
+  #lightControls .row {
+    display:grid; grid-template-columns:62px 1fr 32px; gap:6px; align-items:center;
+  }
+  #lightControls label { color:#888; font-size:10px; }
+  #lightControls input[type=range] { width:100%; accent-color:#ff6600; }
+  #lightControls .val { color:#ccc; font-size:10px; text-align:right; font-variant-numeric:tabular-nums; }
+  #lightControls .toggleRow { display:flex; gap:8px; margin-top:2px; }
+  #lightControls button {
+    flex:1; background:rgba(255,255,255,0.08); color:#ddd; border:none;
+    border-radius:6px; padding:6px 8px; font-size:10px; cursor:pointer;
+  }
+  #lightControls button:hover { background:rgba(255,102,0,0.25); color:#fff; }
+  @media (max-width: 600px) {
+    #previewPanel { width:46vw; top:auto; bottom:100px; right:8px; }
+    #previewCanvasWrap { height:140px; }
+  }
 </style>
-<!-- v=11 cube baseline: Stemkoski smoothed-controls hello cube + MeWorld flyer -->
+<!-- v=12: cube + GLB swap + side model preview -->
 <script src="js/three.js"></script>
+<script src="js/GLTFLoader.js"></script>
+<script src="js/OrbitControls.js"></script>
 <script src="jsartoolkit5/artoolkit.min.js"></script>
 <script src="jsartoolkit5/artoolkit.api.js"></script>
 <script src="threex/threex-artoolkitsource.js"></script>
@@ -33,30 +84,264 @@
 
 <div id="badge">
   <div class="label">MeWorld AR</div>
-  <div class="value">Hello Cube</div>
+  <div class="value" id="badgeValue">Hello Cube</div>
 </div>
+<div id="statusMsg"></div>
 <div id="hint">Point camera at the Hiro marker on the flyer</div>
 
+<div id="previewPanel">
+  <header>MODEL PREVIEW <span id="previewLabel">—</span></header>
+  <div id="previewCanvasWrap"></div>
+  <div id="lightControls">
+    <div class="row">
+      <label>Ambient</label>
+      <input id="lightAmbient" type="range" min="0" max="2" step="0.05" value="0.75">
+      <span class="val" id="lightAmbientVal">0.75</span>
+    </div>
+    <div class="row">
+      <label>Key</label>
+      <input id="lightKey" type="range" min="0" max="3" step="0.05" value="1.00">
+      <span class="val" id="lightKeyVal">1.00</span>
+    </div>
+    <div class="row">
+      <label>Fill</label>
+      <input id="lightFill" type="range" min="0" max="2" step="0.05" value="0.35">
+      <span class="val" id="lightFillVal">0.35</span>
+    </div>
+    <div class="row">
+      <label>Orbit Y</label>
+      <input id="lightOrbit" type="range" min="0" max="360" step="1" value="40">
+      <span class="val" id="lightOrbitVal">40°</span>
+    </div>
+    <div class="row">
+      <label>Height</label>
+      <input id="lightHeight" type="range" min="0.5" max="8" step="0.1" value="5.0">
+      <span class="val" id="lightHeightVal">5.0</span>
+    </div>
+    <div class="toggleRow">
+      <button type="button" id="lightResetBtn">Reset lights</button>
+      <button type="button" id="lightApplyArBtn">Apply to AR</button>
+    </div>
+  </div>
+</div>
+
+<div id="swapBar">
+  <label for="fileInput">Load local model</label>
+  <input id="fileInput" type="file" accept=".glb,.gltf,model/gltf-binary,model/gltf+json">
+  <button type="button" class="secondary" id="resetCubeBtn">Reset to cube</button>
+</div>
+
 <!--
-  Baseline adapted from Lee Stemkoski AR-Examples smoothed-controls.html
-  https://github.com/stemkoski/AR-Examples
-  Full crimson-racer history: branch archive/v10-crimson-racer
+  Cube by default. Swap with:
+  1) Set MODEL_URL below to e.g. 'models/retopology.glb'
+  2) Or tap "Load local model" and pick a .glb from disk
+  Archive racer: branch archive/v10-crimson-racer
 -->
 
 <script>
+// ============================================================
+// SWAP CONFIG — leave empty for cube, or point at a file under /models
+// Example: var MODEL_URL = 'models/Retopology.glb';
+// NOTE: Houdini .glb that starts with PGEO is NOT glTF — export as
+// real glTF Binary, or convert the .obj (see models/Retopology.glb).
+// ============================================================
+var MODEL_URL = 'models/Retopology.glb';
+
 var scene, camera, renderer, clock, deltaTime, totalTime;
 var arToolkitSource, arToolkitContext, smoothedControls;
 var markerRoot1;
-var mesh1;
+var contentRoot;     // holds either cube or loaded model
+var currentContent;  // the active mesh/group
+var objectUrlToRevoke = null;
+
+// Side preview (always visible — proves model loaded without AR marker)
+var previewScene, previewCamera, previewRenderer, previewControls, previewRoot;
+var previewAmbient, previewKey, previewFill;
+var arAmbient, arKey;
 
 initialize();
 animate();
 
+function setStatus(msg, isError) {
+  var el = document.getElementById('statusMsg');
+  el.textContent = msg || '';
+  el.className = isError ? 'error' : '';
+}
+
+function setBadge(name) {
+  document.getElementById('badgeValue').textContent = name;
+  document.getElementById('previewLabel').textContent = name;
+}
+
+function fmt(n, d) {
+  return Number(n).toFixed(d === undefined ? 2 : d);
+}
+
+function updateLightPositions() {
+  if (!previewKey) return;
+  var deg = Number(document.getElementById('lightOrbit').value);
+  var height = Number(document.getElementById('lightHeight').value);
+  var rad = deg * Math.PI / 180;
+  var radius = 4;
+  previewKey.position.set(Math.cos(rad) * radius, height, Math.sin(rad) * radius);
+  previewFill.position.set(Math.cos(rad + Math.PI) * 2.5, Math.max(0.5, height * 0.35), Math.sin(rad + Math.PI) * 2.5);
+  document.getElementById('lightOrbitVal').textContent = Math.round(deg) + '°';
+  document.getElementById('lightHeightVal').textContent = fmt(height, 1);
+}
+
+function applyPreviewLightsFromUI() {
+  if (!previewAmbient) return;
+  var a = Number(document.getElementById('lightAmbient').value);
+  var k = Number(document.getElementById('lightKey').value);
+  var f = Number(document.getElementById('lightFill').value);
+  previewAmbient.intensity = a;
+  previewKey.intensity = k;
+  previewFill.intensity = f;
+  document.getElementById('lightAmbientVal').textContent = fmt(a);
+  document.getElementById('lightKeyVal').textContent = fmt(k);
+  document.getElementById('lightFillVal').textContent = fmt(f);
+  updateLightPositions();
+}
+
+function applyLightsToAR() {
+  if (!arAmbient || !arKey) return;
+  arAmbient.intensity = previewAmbient.intensity;
+  arKey.intensity = previewKey.intensity;
+  arKey.position.copy(previewKey.position);
+  setStatus('Preview lighting applied to AR scene');
+}
+
+function resetLights() {
+  document.getElementById('lightAmbient').value = '0.75';
+  document.getElementById('lightKey').value = '1.00';
+  document.getElementById('lightFill').value = '0.35';
+  document.getElementById('lightOrbit').value = '40';
+  document.getElementById('lightHeight').value = '5.0';
+  applyPreviewLightsFromUI();
+}
+
+function wireLightControls() {
+  ['lightAmbient', 'lightKey', 'lightFill', 'lightOrbit', 'lightHeight'].forEach(function(id) {
+    document.getElementById(id).addEventListener('input', applyPreviewLightsFromUI);
+  });
+  document.getElementById('lightResetBtn').addEventListener('click', resetLights);
+  document.getElementById('lightApplyArBtn').addEventListener('click', applyLightsToAR);
+}
+
+function initPreview() {
+  var wrap = document.getElementById('previewCanvasWrap');
+  var w = wrap.clientWidth || 260;
+  var h = wrap.clientHeight || 200;
+
+  previewScene = new THREE.Scene();
+  previewScene.background = new THREE.Color(0x12121a);
+
+  previewCamera = new THREE.PerspectiveCamera(40, w / h, 0.01, 100);
+  previewCamera.position.set(1.6, 1.2, 2.0);
+
+  previewRenderer = new THREE.WebGLRenderer({ antialias: true });
+  previewRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  previewRenderer.setSize(w, h);
+  wrap.appendChild(previewRenderer.domElement);
+
+  previewAmbient = new THREE.AmbientLight(0xffffff, 0.75);
+  previewScene.add(previewAmbient);
+
+  var hemi = new THREE.HemisphereLight(0xffffff, 0x444466, 0.55);
+  previewScene.add(hemi);
+
+  previewKey = new THREE.DirectionalLight(0xffffff, 1.0);
+  previewKey.position.set(3, 5, 2);
+  previewScene.add(previewKey);
+
+  previewFill = new THREE.DirectionalLight(0x8899ff, 0.35);
+  previewFill.position.set(-2, 1, -2);
+  previewScene.add(previewFill);
+
+  var grid = new THREE.GridHelper(2, 8, 0x444455, 0x2a2a35);
+  grid.position.y = 0;
+  previewScene.add(grid);
+
+  previewRoot = new THREE.Group();
+  previewScene.add(previewRoot);
+
+  previewControls = new THREE.OrbitControls(previewCamera, previewRenderer.domElement);
+  previewControls.enableDamping = true;
+  previewControls.dampingFactor = 0.12;
+  previewControls.rotateSpeed = 0.45;
+  previewControls.zoomSpeed = 0.8;
+  previewControls.target.set(0, 0.4, 0);
+
+  wireLightControls();
+  applyPreviewLightsFromUI();
+  window.addEventListener('resize', resizePreview);
+}
+
+function resizePreview() {
+  if (!previewRenderer) return;
+  var wrap = document.getElementById('previewCanvasWrap');
+  var w = wrap.clientWidth;
+  var h = wrap.clientHeight;
+  if (!w || !h) return;
+  previewCamera.aspect = w / h;
+  previewCamera.updateProjectionMatrix();
+  previewRenderer.setSize(w, h);
+}
+
+function syncPreviewFromContent() {
+  if (!previewRoot || !currentContent) return;
+
+  while (previewRoot.children.length) {
+    previewRoot.remove(previewRoot.children[0]);
+  }
+
+  var clone = currentContent.clone(true);
+  // Normalize independently of AR placement so preview stays readable
+  clone.position.set(0, 0, 0);
+  clone.rotation.set(0, 0, 0);
+  clone.scale.set(1, 1, 1);
+
+  // glTF with metalness=1 looks black without an env map — soften for preview readability
+  clone.traverse(function(obj) {
+    if (!obj.isMesh || !obj.material) return;
+    var mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+    for (var i = 0; i < mats.length; i++) {
+      var m = mats[i];
+      if (!m) continue;
+      // clone material so AR content stays untouched
+      m = m.clone();
+      mats[i] = m;
+      if (m.metalness !== undefined) m.metalness = Math.min(m.metalness, 0.25);
+      if (m.roughness !== undefined) m.roughness = Math.max(m.roughness, 0.35);
+      if (m.color && m.color.getHex() === 0x000000) m.color.setHex(0x888888);
+      m.needsUpdate = true;
+    }
+    obj.material = Array.isArray(obj.material) ? mats : mats[0];
+  });
+
+  previewRoot.add(clone);
+
+  var box = new THREE.Box3().setFromObject(clone);
+  var size = box.getSize(new THREE.Vector3());
+  var center = box.getCenter(new THREE.Vector3());
+  var maxDim = Math.max(size.x, size.y, size.z) || 1;
+  var s = 1.2 / maxDim;
+  clone.scale.setScalar(s);
+  clone.position.set(-center.x * s, -center.y * s + 0.35, -center.z * s);
+
+  previewControls.target.set(0, 0.35, 0);
+  previewCamera.position.set(1.6, 1.1, 2.0);
+  previewControls.update();
+}
+
 function initialize() {
   scene = new THREE.Scene();
 
-  var ambientLight = new THREE.AmbientLight(0xcccccc, 0.5);
-  scene.add(ambientLight);
+  arAmbient = new THREE.AmbientLight(0xcccccc, 0.7);
+  scene.add(arAmbient);
+  arKey = new THREE.DirectionalLight(0xffffff, 1.0);
+  arKey.position.set(2, 4, 3);
+  scene.add(arKey);
 
   camera = new THREE.Camera();
   scene.add(camera);
@@ -105,8 +390,7 @@ function initialize() {
     camera.projectionMatrix.copy(arToolkitContext.getProjectionMatrix());
   });
 
-  // Canonical Stemkoski hierarchy:
-  // markerRoot and smoothedRoot are SIBLINGS under scene
+  // Stemkoski hierarchy: markerRoot and smoothedRoot are siblings
   markerRoot1 = new THREE.Group();
   scene.add(markerRoot1);
 
@@ -123,16 +407,153 @@ function initialize() {
     lerpScale: 1
   });
 
-  var geometry1 = new THREE.CubeGeometry(1, 1, 1);
-  var material1 = new THREE.MeshNormalMaterial({
+  contentRoot = new THREE.Group();
+  smoothedRoot.add(contentRoot);
+
+  initPreview();
+  showCube();
+
+  // Optional auto-load from models/ path
+  if (MODEL_URL) {
+    loadModelFromUrl(MODEL_URL, MODEL_URL.split('/').pop());
+  }
+
+  document.getElementById('fileInput').addEventListener('change', onLocalFilePicked);
+  document.getElementById('resetCubeBtn').addEventListener('click', function() {
+    showCube();
+    setStatus('Reset to placeholder cube');
+  });
+}
+
+function clearContent() {
+  while (contentRoot.children.length) {
+    contentRoot.remove(contentRoot.children[0]);
+  }
+  currentContent = null;
+  if (objectUrlToRevoke) {
+    URL.revokeObjectURL(objectUrlToRevoke);
+    objectUrlToRevoke = null;
+  }
+}
+
+function showCube() {
+  clearContent();
+
+  var Geo = THREE.BoxGeometry || THREE.CubeGeometry;
+  var geometry = new Geo(1, 1, 1);
+  var material = new THREE.MeshNormalMaterial({
     transparent: true,
     opacity: 0.5,
     side: THREE.DoubleSide
   });
 
-  mesh1 = new THREE.Mesh(geometry1, material1);
-  mesh1.position.y = 0.5;
-  smoothedRoot.add(mesh1);
+  var cube = new THREE.Mesh(geometry, material);
+  cube.position.y = 0.5;
+  contentRoot.add(cube);
+  currentContent = cube;
+
+  setBadge('Hello Cube');
+  setStatus('Placeholder cube — load a local .glb to replace it');
+  syncPreviewFromContent();
+}
+
+function fitAndPlace(object3d) {
+  var box = new THREE.Box3().setFromObject(object3d);
+  var size = box.getSize(new THREE.Vector3());
+  var center = box.getCenter(new THREE.Vector3());
+  var maxDim = Math.max(size.x, size.y, size.z);
+
+  if (!isFinite(maxDim) || maxDim === 0) {
+    throw new Error('Model has empty bounding box');
+  }
+
+  // Match the ~1 unit cube scale
+  var scale = 1.0 / maxDim;
+  object3d.scale.setScalar(scale);
+  object3d.position.x = -center.x * scale;
+  object3d.position.y = -center.y * scale + 0.5;
+  object3d.position.z = -center.z * scale;
+}
+
+function placeAsContent(object3d, label) {
+  clearContent();
+  fitAndPlace(object3d);
+  contentRoot.add(object3d);
+  currentContent = object3d;
+  setBadge(label || 'Loaded model');
+  syncPreviewFromContent();
+}
+
+function loadModelFromUrl(url, label) {
+  setStatus('Loading ' + (label || url) + '...');
+  var loader = new THREE.GLTFLoader();
+  loader.load(
+    url,
+    function(gltf) {
+      if (!gltf || !gltf.scene) {
+        setStatus('Loader returned no scene', true);
+        return;
+      }
+      try {
+        placeAsContent(gltf.scene, label || 'Model');
+        setStatus('Replaced cube with ' + (label || url));
+      } catch (e) {
+        setStatus(String(e.message || e), true);
+        showCube();
+      }
+    },
+    function(xhr) {
+      if (xhr && xhr.total) {
+        var pct = Math.round(xhr.loaded / xhr.total * 100);
+        setStatus('Loading ' + (label || 'model') + ' — ' + pct + '%');
+      }
+    },
+    function(err) {
+      console.error('[AR] GLB load error:', err);
+      setStatus('Failed to load model — need real glTF (.glb starting with "glTF"). Houdini PGEO .glb will not work.', true);
+    }
+  );
+}
+
+function onLocalFilePicked(e) {
+  var file = e.target.files && e.target.files[0];
+  if (!file) return;
+
+  var name = file.name.toLowerCase();
+  if (!name.endsWith('.glb') && !name.endsWith('.gltf')) {
+    setStatus('Use a .glb or .gltf file', true);
+    e.target.value = '';
+    return;
+  }
+
+  // Preflight header of .glb files (real glTF starts with "glTF")
+  if (name.endsWith('.glb')) {
+    var headerReader = new FileReader();
+    headerReader.onload = function() {
+      var u8 = new Uint8Array(headerReader.result);
+      var magic = String.fromCharCode(u8[0], u8[1], u8[2], u8[3]);
+      if (magic !== 'glTF') {
+        setStatus('Not a glTF file (header "' + magic + '"). Houdini geo named .glb is often PGEO. Convert the .obj or export glTF Binary.', true);
+        e.target.value = '';
+        return;
+      }
+      var url = URL.createObjectURL(file);
+      objectUrlToRevoke = url;
+      loadModelFromUrl(url, file.name);
+      e.target.value = '';
+    };
+    headerReader.onerror = function() {
+      setStatus('Could not read file', true);
+      e.target.value = '';
+    };
+    headerReader.readAsArrayBuffer(file.slice(0, 4));
+    return;
+  }
+
+  var url = URL.createObjectURL(file);
+  objectUrlToRevoke = url;
+  loadModelFromUrl(url, file.name);
+  e.target.value = '';
 }
 
 function update() {
@@ -140,10 +561,12 @@ function update() {
     arToolkitContext.update(arToolkitSource.domElement);
   }
   smoothedControls.update(markerRoot1);
+  if (previewControls) previewControls.update();
 }
 
 function render() {
   renderer.render(scene, camera);
+  if (previewRenderer) previewRenderer.render(previewScene, previewCamera);
 }
 
 function animate() {
