@@ -151,9 +151,14 @@ class ARRequestHandler(http.server.SimpleHTTPRequestHandler):
         sys.stderr.write("%s - %s\n" % (self.address_string(), fmt % args))
 
 
+class ARThreadingHTTPServer(http.server.ThreadingHTTPServer):
+    daemon_threads = True
+    allow_reuse_address = True
+
+
 def run_http(port: int = 8080):
     ensure_defaults()
-    httpd = http.server.ThreadingHTTPServer(("0.0.0.0", port), ARRequestHandler)
+    httpd = ARThreadingHTTPServer(("0.0.0.0", port), ARRequestHandler)
     print(f"[HTTP] http://127.0.0.1:{port}/index.html")
     print(f"[HTTP] settings -> {SETTINGS_PATH}")
     print("[HTTP] POST /api/settings  ·  POST /api/upload-model")

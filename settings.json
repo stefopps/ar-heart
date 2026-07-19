@@ -8,13 +8,13 @@
   "orientYaw": "0",
   "orientPitch": "0",
   "orientRoll": "0",
-  "modelUrl": "models/retopology.glb",
-  "modelLabel": "retopology.glb",
+  "modelUrl": "models/crimson-racer.glb",
+  "modelLabel": "crimson-racer.glb",
   "webcamEnabled": true,
   "driveEnabled": false,
   "driveSpeed": 0.95,
   "driveRange": 1.35,
   "panel": null,
   "version": 23,
-  "savedAt": 1784478974800
+  "savedAt": 1784480396423
 }

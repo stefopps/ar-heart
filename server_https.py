@@ -46,10 +46,35 @@ if not os.path.exists(cert_file) or not os.path.exists(key_file):
 
 ensure_defaults()
 port = int(sys.argv[1]) if len(sys.argv) > 1 else 8443
-httpd = http.server.ThreadingHTTPServer(("0.0.0.0", port), ARRequestHandler)
+
 ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
 ctx.load_cert_chain(cert_file, key_file)
-httpd.socket = ctx.wrap_socket(httpd.socket, server_side=True)
+
+
+class ThreadingHTTPSServer(http.server.ThreadingHTTPServer):
+    """TLS handshake happens per-connection in the worker thread, not on the
+    main accept loop. A phone stalling on the cert warning (or a half-open
+    connection) can no longer freeze the whole server."""
+    daemon_threads = True
+    allow_reuse_address = True
+
+    def get_request(self):
+        # Accept the raw TCP socket and wrap it WITHOUT handshaking here
+        sock, addr = self.socket.accept()
+        sock.settimeout(30)  # so a dead client's handshake/read can't hang forever
+        ssock = ctx.wrap_socket(sock, server_side=True, do_handshake_on_connect=False)
+        return ssock, addr
+
+    def finish_request(self, request, client_address):
+        # Runs in the per-request daemon thread — do the handshake here
+        try:
+            request.do_handshake()
+        except (ssl.SSLError, OSError):
+            return  # bad/stalled handshake: drop just this connection
+        super().finish_request(request, client_address)
+
+
+httpd = ThreadingHTTPSServer(("0.0.0.0", port), ARRequestHandler)
 
 print(f"[HTTPS] https://192.168.1.157:{port}/index.html")
 print(f"[HTTPS] settings -> {SETTINGS_PATH}")

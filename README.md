@@ -100,6 +100,27 @@ Aggressive media queries (`hover: none` and `pointer: coarse`) sometimes matched
 
 **Also:** `loadModelFromUrl` now uses browser `fetch` (not Three.js `FileLoader` XHR) for downloading GLB files. `FileLoader` silently hangs when WebGL context is lost; `fetch` survives context loss independently.
 
+### #5 KILLER: HTTPS server freezes when a phone stalls at the cert warning
+
+`server_https.py` used to wrap TLS onto the **listening socket** (`ctx.wrap_socket(httpd.socket)`), so the handshake ran on the **main accept thread**. When a phone opened the page and paused at the self-signed cert warning, that half-open connection **froze the entire server** — every other device got "connection lost" and the page wouldn't open.
+
+**Prevention:** `server_https.py` now uses a `ThreadingHTTPSServer` that:
+- wraps each accepted socket with `do_handshake_on_connect=False` (no handshake on the accept thread),
+- runs `request.do_handshake()` inside `finish_request` (per-connection worker thread),
+- sets `sock.settimeout(30)` and `daemon_threads = True`.
+
+So one stalled client only drops its own connection. **Verify after any `server_https.py` change** with the stall test in `AGENTS.md` (checklist 5b) — 3 hung connections must not delay a real request.
+
+### Model format note: serve GLB, not FBX
+
+Three.js r86 handles raw FBX poorly, and FBX texture references (e.g. Meshy's absolute Windows paths) break on the web. Convert FBX + textures → a single embedded-texture GLB with **FBX2glTF** (`C:\Users\steve\Downloads\FBX2glTF.exe`):
+
+```
+FBX2glTF.exe --binary --input "model.fbx" --output "models/name"
+```
+
+`--binary` embeds all textures into one `.glb`. Then point `MODEL_URL` + `settings.json` at it. This is how `models/crimson-racer.glb` was made.
+
 ## Incremental rule
 
 Build one feature at a time on top of this cube. When you need old racer files:

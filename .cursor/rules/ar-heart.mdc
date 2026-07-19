@@ -26,8 +26,17 @@ Three.js r86 (bundled in js/three.js). This is an OLD version — many modern AP
    ```
 4. **Flyer version matches:** version badge in `flyer.html` must match `v=XX` in `index.html` version comment.
 5. **Visual smoke test:** `python _smoke.py` or open `http://127.0.0.1:8080/index.html?v=XX`, verify model loaded, no PAGE_ERROR in console.
+6. **If `server_https.py` changed — stall test:** one hung phone must NOT freeze the server.
+   ```
+   python -c "import socket,urllib.request,ssl,time; s=[socket.create_connection(('127.0.0.1',8443)) for _ in range(3)]; c=ssl.create_default_context(); c.check_hostname=False; c.verify_mode=ssl.CERT_NONE; t=time.time(); urllib.request.urlopen('https://127.0.0.1:8443/index.html',context=c,timeout=15).read(); print('OK',round(time.time()-t,2),'s'); [x.close() for x in s]"
+   ```
 
-## Four killers (learned the hard way)
+## Model format rule
+
+- **Serve GLB, never raw FBX/OBJ.** r86 handles FBX poorly; external texture paths break on the web.
+- Convert with FBX2glTF (`C:\Users\steve\Downloads\FBX2glTF.exe`): `FBX2glTF.exe --binary --input model.fbx --output models/name` → single `.glb` with all textures embedded.
+
+## Five killers (learned the hard way)
 
 | # | Killer | Symptom | Result | Prevention |
 |---|--------|---------|--------|------------|
@@ -35,6 +44,7 @@ Three.js r86 (bundled in js/three.js). This is an OLD version — many modern AP
 | 2 | Third WebGL context | Context loss | Black preview | CSS 3D transforms, never 3rd renderer |
 | 3 | `isPhoneUI()` blocks `initPreview()` | Preview never inits | No preview on desktop | `shouldInitPreview()` uses `innerWidth > 900` |
 | 4 | `THREE.Quaternion.identity()` in r86 | `PAGE_ERROR: qUp.identity is not a function` | Crash in `applyOrientation()` → no cube, no model | Use `.set(0,0,0,1)`. Check `js/three.js` for any new API. |
+| 5 | TLS handshake on HTTPS main accept thread | Phone: "connection lost" / page won't open | One stalled phone freezes the WHOLE server | `server_https.py`: wrap with `do_handshake_on_connect=False`, handshake in `finish_request` (worker thread), `daemon_threads=True`, 30s timeout |
 
 ## Boot order (v=29, DO NOT CHANGE)
 
