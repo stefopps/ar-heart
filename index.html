@@ -36,48 +36,138 @@
   #statusMsg.error { color:#ff5555; }
   #previewPanel {
     position:fixed; top:12px; right:12px; z-index:25;
-    width:min(300px, 46vw);
-    background:rgba(10,10,20,0.92); border:1px solid rgba(255,102,0,0.35);
-    border-radius:12px; overflow:hidden; box-shadow:0 8px 28px rgba(0,0,0,0.45);
+    width:340px; height:560px;
+    min-width:240px; min-height:300px;
+    max-width:92vw; max-height:92vh;
+    display:flex; flex-direction:column;
+    background:rgba(10,10,20,0.94); border:1px solid rgba(255,102,0,0.45);
+    border-radius:12px; overflow:hidden; box-shadow:0 8px 28px rgba(0,0,0,0.55);
   }
   #previewPanel header {
-    display:flex; justify-content:space-between; align-items:center;
+    display:flex; justify-content:space-between; align-items:center; gap:8px;
     padding:8px 10px; border-bottom:1px solid rgba(255,255,255,0.08);
     color:#ff6600; font-size:11px; font-weight:600; letter-spacing:0.4px;
+    cursor:move; user-select:none; flex:0 0 auto;
+    background:linear-gradient(180deg, rgba(255,102,0,0.12), transparent);
   }
-  #previewPanel header span { color:#666; font-weight:400; font-size:10px; }
-  #previewAxisHint {
-    padding:4px 10px 0; color:#8f8; font-size:10px; letter-spacing:0.3px;
+  #previewPanel header .dragHint { color:#666; font-weight:400; font-size:9px; }
+  #previewLabel { color:#aaa; font-weight:400; font-size:10px; max-width:100px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #previewToolbar {
+    display:flex; gap:6px; padding:6px 10px; flex:0 0 auto;
+    border-bottom:1px solid rgba(255,255,255,0.06);
   }
-  #previewAxisHint b { color:#00ff88; }
-  #previewCanvasWrap { width:100%; height:200px; cursor:grab; position:relative; }
-  #previewCanvasWrap:active { cursor:grabbing; }
-  #lightControls {
-    padding:8px 10px 10px; border-top:1px solid rgba(255,255,255,0.08);
-    display:flex; flex-direction:column; gap:6px;
-  }
-  #lightControls .row {
-    display:grid; grid-template-columns:62px 1fr 32px; gap:6px; align-items:center;
-  }
-  #lightControls label { color:#888; font-size:10px; }
-  #lightControls input[type=range] { width:100%; accent-color:#ff6600; }
-  #lightControls .val { color:#ccc; font-size:10px; text-align:right; font-variant-numeric:tabular-nums; }
-  #lightControls .toggleRow { display:flex; gap:8px; margin-top:2px; }
-  #lightControls button {
+  #previewToolbar button {
     flex:1; background:rgba(255,255,255,0.08); color:#ddd; border:none;
     border-radius:6px; padding:6px 8px; font-size:10px; cursor:pointer;
   }
-  #lightControls button:hover { background:rgba(255,102,0,0.25); color:#fff; }
+  #previewToolbar button.on { background:rgba(255,102,0,0.35); color:#fff; }
+  #previewToolbar button:hover { background:rgba(255,102,0,0.25); color:#fff; }
+  #previewAxisHint {
+    padding:4px 10px; color:#8f8; font-size:10px; letter-spacing:0.3px; flex:0 0 auto;
+  }
+  #previewAxisHint b { color:#00ff88; }
+  /* Canvas must own leftover height — black empty panel was zero-size wrap */
+  #previewCanvasWrap {
+    width:100%; flex:1 1 240px; min-height:220px; height:240px; cursor:grab; position:relative;
+    background:#1c1c2a; overflow:hidden;
+  }
+  #previewCanvasWrap > canvas { display:block; width:100% !important; height:100% !important; }
+  #previewCanvasWrap:active { cursor:grabbing; }
+  #orientCubeWrap {
+    position:absolute; left:8px; bottom:8px; width:112px; height:130px; z-index:5;
+    border-radius:10px; border:1px solid rgba(255,102,0,0.5);
+    background:rgba(8,8,14,0.72); box-shadow:0 4px 14px rgba(0,0,0,0.45);
+    overflow:hidden; pointer-events:auto; user-select:none;
+  }
+  #orientCubeStage {
+    width:112px; height:112px; perspective:480px;
+    display:flex; align-items:center; justify-content:center;
+    cursor:grab; touch-action:none;
+  }
+  #orientCubeStage.dragging { cursor:grabbing; }
+  #orientCube {
+    width:58px; height:58px; position:relative;
+    transform-style:preserve-3d;
+    transform:rotateX(-28deg) rotateY(38deg);
+  }
+  #orientCube .face {
+    position:absolute; width:58px; height:58px; left:0; top:0;
+    border:none; margin:0; padding:0; cursor:pointer;
+    color:#fff; font:bold 12px system-ui,Segoe UI,sans-serif;
+    display:flex; align-items:center; justify-content:center;
+    backface-visibility:hidden; box-sizing:border-box;
+    border:1px solid rgba(255,255,255,0.28);
+  }
+  #orientCube .face.selected {
+    outline:2px solid #00ff88; box-shadow:0 0 10px rgba(0,255,136,0.55);
+  }
+  #orientCube .face-px { background:#8b2222; transform:rotateY(90deg) translateZ(29px); }
+  #orientCube .face-nx { background:#4a1212; transform:rotateY(-90deg) translateZ(29px); }
+  #orientCube .face-py { background:#1f8b3a; transform:rotateX(-90deg) translateZ(29px); }
+  #orientCube .face-ny { background:#0f4420; transform:rotateX(90deg) translateZ(29px); }
+  #orientCube .face-pz { background:#2255aa; transform:translateZ(29px); }
+  #orientCube .face-nz { background:#122a55; transform:rotateY(180deg) translateZ(29px); }
+  #orientCubeWrap .orientCubeHint {
+    height:18px; line-height:18px; text-align:center; font-size:8px; letter-spacing:0.2px;
+    color:#aaa; background:rgba(0,0,0,0.45); pointer-events:none;
+  }
+  #previewBody {
+    flex:0 1 auto; overflow-x:hidden; overflow-y:auto; max-height:38%;
+    border-top:1px solid rgba(255,255,255,0.08);
+  }
+  #previewPanel.controls-collapsed #previewBody { display:none; }
+  #previewPanel.controls-collapsed #previewAxisHint { display:none; }
+  #previewResize {
+    position:absolute; right:0; bottom:0; width:18px; height:18px; cursor:nwse-resize;
+    background:linear-gradient(135deg, transparent 50%, rgba(255,102,0,0.85) 50%);
+    z-index:3;
+  }
+  #orientSection, #lightControls {
+    padding:8px 10px 10px; border-top:1px solid rgba(255,255,255,0.08);
+    display:flex; flex-direction:column; gap:6px;
+  }
+  #orientSection .title {
+    color:#ff6600; font-size:10px; font-weight:600; letter-spacing:0.4px;
+  }
+  #orientSection .row, #lightControls .row {
+    display:grid; grid-template-columns:62px 1fr 32px; gap:6px; align-items:center;
+  }
+  #orientSection label, #lightControls label { color:#888; font-size:10px; }
+  #orientSection input[type=range], #lightControls input[type=range] { width:100%; accent-color:#ff6600; }
+  #orientSection select {
+    width:100%; background:#1a1a24; color:#e0e0e0; border:1px solid #444;
+    border-radius:4px; font-size:10px; padding:3px 2px;
+  }
+  #orientSection .val, #lightControls .val { color:#ccc; font-size:10px; text-align:right; font-variant-numeric:tabular-nums; }
+  #orientSection .toggleRow, #lightControls .toggleRow { display:flex; gap:6px; margin-top:2px; flex-wrap:wrap; }
+  #orientSection button, #lightControls button {
+    flex:1; min-width:70px; background:rgba(255,255,255,0.08); color:#ddd; border:none;
+    border-radius:6px; padding:6px 8px; font-size:10px; cursor:pointer;
+  }
+  #orientSection button:hover, #lightControls button:hover { background:rgba(255,102,0,0.25); color:#fff; }
 
-  /* Phone: hide desktop preview tooling — AR + touch only */
-  @media (max-width: 900px), (hover: none) and (pointer: coarse) {
+  #phoneOrient {
+    display:none;
+    position:fixed; top:12px; right:12px; z-index:22;
+    background:rgba(10,10,20,0.9); border:1px solid rgba(255,102,0,0.35);
+    border-radius:10px; padding:8px 10px; color:#ddd; font-size:11px;
+  }
+  #phoneOrient label { display:block; color:#888; font-size:9px; margin-bottom:4px; text-transform:uppercase; letter-spacing:0.5px; }
+  #phoneOrient select {
+    background:#1a1a24; color:#e0e0e0; border:1px solid #444; border-radius:6px;
+    font-size:12px; padding:6px 8px; max-width:42vw;
+  }
+
+  /* Phone / narrow only — don't use coarse-pointer alone (hides desktop preview on touch laptops + headless) */
+  @media (max-width: 900px) {
     #previewPanel { display:none !important; }
+    #phoneOrient { display:block; }
     #swapBar { bottom:72px; }
     #swapBar label, #swapBar button { padding:8px 12px; font-size:12px; }
     #hint { bottom:16px; font-size:11px; color:rgba(255,255,255,0.7); }
   }
 </style>
-<!-- v=13: phone AR touch + lit materials + desktop preview UP axis -->
+<!-- v=29: fix qUp.identity() crash (r86 Quaternion has no .identity); fetch-based GLB load -->
 <script src="js/three.js"></script>
 <script src="js/GLTFLoader.js"></script>
 <script src="js/OrbitControls.js"></script>
@@ -96,44 +186,116 @@
   <div class="value" id="badgeValue">Hello Cube</div>
 </div>
 <div id="statusMsg"></div>
-<div id="hint">Point at Hiro marker · swipe rotate · pinch zoom · two-finger pan · double-tap reset</div>
+<div id="hint">Point at Hiro · green pad = locked · lights/orient auto-apply to AR · swipe rotate · pinch zoom</div>
+
+<div id="phoneOrient">
+  <label>Model UP</label>
+  <select id="upAxisPhone">
+    <option value="+Y">+Y Blender</option>
+    <option value="+Z">+Z Houdini</option>
+    <option value="-Y">−Y</option>
+    <option value="-Z">−Z</option>
+    <option value="+X">+X</option>
+    <option value="-X">−X</option>
+  </select>
+</div>
 
 <div id="previewPanel">
-  <header>MODEL PREVIEW <span id="previewLabel">—</span></header>
-  <div id="previewAxisHint"><b>GREEN = UP</b> (Y+) — same up on phone AR</div>
-  <div id="previewCanvasWrap"></div>
-  <div id="lightControls">
-    <div class="row">
-      <label>Ambient</label>
-      <input id="lightAmbient" type="range" min="0" max="3" step="0.05" value="1.20">
-      <span class="val" id="lightAmbientVal">1.20</span>
-    </div>
-    <div class="row">
-      <label>Key</label>
-      <input id="lightKey" type="range" min="0" max="4" step="0.05" value="1.80">
-      <span class="val" id="lightKeyVal">1.80</span>
-    </div>
-    <div class="row">
-      <label>Fill</label>
-      <input id="lightFill" type="range" min="0" max="2" step="0.05" value="0.60">
-      <span class="val" id="lightFillVal">0.60</span>
-    </div>
-    <div class="row">
-      <label>Orbit Y</label>
-      <input id="lightOrbit" type="range" min="0" max="360" step="1" value="40">
-      <span class="val" id="lightOrbitVal">40°</span>
-    </div>
-    <div class="row">
-      <label>Height</label>
-      <input id="lightHeight" type="range" min="0.5" max="8" step="0.1" value="5.0">
-      <span class="val" id="lightHeightVal">5.0</span>
-    </div>
-    <div class="toggleRow">
-      <button type="button" id="lightResetBtn">Reset lights</button>
-      <button type="button" id="lightSaveBtn">Save settings</button>
-      <button type="button" id="lightApplyArBtn">Apply to AR</button>
+  <header id="previewDragBar">
+    <span>MODEL PREVIEW</span>
+    <span id="previewLabel">—</span>
+    <span class="dragHint">drag · corner resize</span>
+  </header>
+  <div id="previewToolbar">
+    <button type="button" id="webcamToggleBtn" class="on">Webcam ON</button>
+    <button type="button" id="previewCollapseBtn">Hide controls</button>
+  </div>
+  <div id="previewAxisHint"><b>GREEN = DISPLAY UP</b> — click a cube face to set model up-axis</div>
+  <div id="previewCanvasWrap">
+    <div id="orientCubeWrap" title="Drag to rotate · click a face = MODEL UP">
+      <div id="orientCubeStage">
+        <div id="orientCube">
+          <button type="button" class="face face-px" data-axis="+X">+X</button>
+          <button type="button" class="face face-nx" data-axis="-X">−X</button>
+          <button type="button" class="face face-py" data-axis="+Y">+Y</button>
+          <button type="button" class="face face-ny" data-axis="-Y">−Y</button>
+          <button type="button" class="face face-pz" data-axis="+Z">+Z</button>
+          <button type="button" class="face face-nz" data-axis="-Z">−Z</button>
+        </div>
+      </div>
+      <div class="orientCubeHint">drag rotate · click = UP</div>
     </div>
   </div>
+  <div id="previewBody">
+    <div id="orientSection">
+      <div class="title">ORIENTATION (UP VECTOR)</div>
+      <div class="row">
+        <label>Model UP</label>
+        <select id="upAxis">
+          <option value="+Y" selected>+Y (Blender / glTF)</option>
+          <option value="+Z">+Z (Houdini / CAD)</option>
+          <option value="-Y">−Y</option>
+          <option value="-Z">−Z</option>
+          <option value="+X">+X</option>
+          <option value="-X">−X</option>
+        </select>
+        <span class="val" id="upAxisVal">Y</span>
+      </div>
+      <div class="row">
+        <label>Yaw</label>
+        <input id="orientYaw" type="range" min="-180" max="180" step="1" value="0">
+        <span class="val" id="orientYawVal">0°</span>
+      </div>
+      <div class="row">
+        <label>Pitch</label>
+        <input id="orientPitch" type="range" min="-180" max="180" step="1" value="0">
+        <span class="val" id="orientPitchVal">0°</span>
+      </div>
+      <div class="row">
+        <label>Roll</label>
+        <input id="orientRoll" type="range" min="-180" max="180" step="1" value="0">
+        <span class="val" id="orientRollVal">0°</span>
+      </div>
+      <div class="toggleRow">
+        <button type="button" id="orientResetBtn">Reset orient</button>
+        <button type="button" id="orientHoudiniBtn">Houdini Z-up</button>
+        <button type="button" id="orientBlenderBtn">Blender Y-up</button>
+      </div>
+    </div>
+    <div id="lightControls">
+      <div class="row">
+        <label>Ambient</label>
+        <input id="lightAmbient" type="range" min="0" max="3" step="0.05" value="1.20">
+        <span class="val" id="lightAmbientVal">1.20</span>
+      </div>
+      <div class="row">
+        <label>Key</label>
+        <input id="lightKey" type="range" min="0" max="4" step="0.05" value="1.80">
+        <span class="val" id="lightKeyVal">1.80</span>
+      </div>
+      <div class="row">
+        <label>Fill</label>
+        <input id="lightFill" type="range" min="0" max="2" step="0.05" value="0.60">
+        <span class="val" id="lightFillVal">0.60</span>
+      </div>
+      <div class="row">
+        <label>Orbit Y</label>
+        <input id="lightOrbit" type="range" min="0" max="360" step="1" value="40">
+        <span class="val" id="lightOrbitVal">40°</span>
+      </div>
+      <div class="row">
+        <label>Height</label>
+        <input id="lightHeight" type="range" min="0.5" max="8" step="0.1" value="5.0">
+        <span class="val" id="lightHeightVal">5.0</span>
+      </div>
+      <div class="toggleRow">
+        <button type="button" id="lightResetBtn">Reset lights</button>
+        <button type="button" id="lightSaveBtn">Save JSON</button>
+        <button type="button" id="lightApplyArBtn">Apply to AR</button>
+      </div>
+    </div>
+  </div>
+  <div id="previewResize" title="Resize"></div>
 </div>
 
 <div id="swapBar">
@@ -152,6 +314,7 @@ var scene, camera, renderer, clock, deltaTime, totalTime;
 var arToolkitSource, arToolkitContext, smoothedControls;
 var markerRoot1;
 var touchOrbit;      // user rotate / pinch / pan
+var orientRoot;      // up-vector + yaw/pitch/roll (shared preview + AR)
 var contentRoot;     // holds either cube or loaded model
 var currentContent;
 var objectUrlToRevoke = null;
@@ -172,13 +335,21 @@ var panX = 0, panY = 0;
 var targetPanX = 0, targetPanY = 0;
 var touchMoved = false;
 var lastTapAt = 0;
-var SETTINGS_KEY = 'meworld-ar-settings-v13';
-
-initialize();
-animate();
+var SETTINGS_KEY = 'meworld-ar-settings-v14';
+var SETTINGS_API = '/api/settings';
+var SETTINGS_FILE = 'settings.json';
+var webcamEnabled = true;
+var activeModelUrl = '';
+var activeModelLabel = '';
+var _saveDiskTimer = null;
 
 function isPhoneUI() {
-  return window.matchMedia('(max-width: 900px), (hover: none) and (pointer: coarse)').matches;
+  return window.matchMedia('(max-width: 900px)').matches;
+}
+
+/** Preview GL when viewport is wide enough for the floating panel. */
+function shouldInitPreview() {
+  return window.innerWidth > 900;
 }
 
 function setStatus(msg, isError) {
@@ -197,6 +368,179 @@ function fmt(n, d) {
   return Number(n).toFixed(d === undefined ? 2 : d);
 }
 
+function axisLabel(v) {
+  return (v || '+Y').replace('+', '');
+}
+
+function getUpAxisVector() {
+  var key = document.getElementById('upAxis').value || '+Y';
+  var map = {
+    '+Y': [0, 1, 0], '-Y': [0, -1, 0],
+    '+Z': [0, 0, 1], '-Z': [0, 0, -1],
+    '+X': [1, 0, 0], '-X': [-1, 0, 0]
+  };
+  var a = map[key] || map['+Y'];
+  return new THREE.Vector3(a[0], a[1], a[2]).normalize();
+}
+
+/** Quaternion that maps the model's "up" axis onto world +Y (display / AR up). */
+function getOrientationQuaternion() {
+  var from = getUpAxisVector();
+  var to = new THREE.Vector3(0, 1, 0);
+  var qUp = new THREE.Quaternion();
+  if (from.distanceToSquared(to) < 1e-8) {
+    qUp.set(0, 0, 0, 1); // identity (THREE.Quaternion.identity() not in r86)
+  } else if (from.distanceToSquared(to.clone().negate()) < 1e-8) {
+    qUp.setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI);
+  } else {
+    qUp.setFromUnitVectors(from, to);
+  }
+
+  var yaw = Number(document.getElementById('orientYaw').value) * Math.PI / 180;
+  var pitch = Number(document.getElementById('orientPitch').value) * Math.PI / 180;
+  var roll = Number(document.getElementById('orientRoll').value) * Math.PI / 180;
+
+  var e = new THREE.Euler(pitch, yaw, roll, 'YXZ');
+  var qExtra = new THREE.Quaternion().setFromEuler(e);
+  return qExtra.multiply(qUp);
+}
+
+function updateAxisHint() {
+  var el = document.getElementById('previewAxisHint');
+  if (!el) return;
+  var up = document.getElementById('upAxis').value || '+Y';
+  el.innerHTML = '<b>GREEN = DISPLAY UP</b> — model ' + up + ' → world +Y (phone + preview)';
+  var val = document.getElementById('upAxisVal');
+  if (val) val.textContent = axisLabel(up);
+  document.getElementById('orientYawVal').textContent = Math.round(Number(document.getElementById('orientYaw').value)) + '°';
+  document.getElementById('orientPitchVal').textContent = Math.round(Number(document.getElementById('orientPitch').value)) + '°';
+  document.getElementById('orientRollVal').textContent = Math.round(Number(document.getElementById('orientRoll').value)) + '°';
+}
+
+function applyOrientation(opts) {
+  opts = opts || {};
+  var q = getOrientationQuaternion();
+  if (orientRoot) orientRoot.quaternion.copy(q);
+  updateAxisHint();
+  if (previewRoot) syncPreviewFromContent();
+  syncOrientCube();
+  if (opts.persist) saveSettings();
+}
+
+function setModelUpAxis(axis, opts) {
+  opts = opts || {};
+  var sel = document.getElementById('upAxis');
+  if (sel) sel.value = axis;
+  var phone = document.getElementById('upAxisPhone');
+  if (phone) phone.value = axis;
+  applyOrientation({ persist: opts.persist !== false });
+  setStatus('MODEL UP → ' + axis + ' (maps to display green / world +Y)');
+}
+
+/** CSS 3D cube — drag to spin, click face = MODEL UP (no extra WebGL). */
+var orientCubeRotX = -28;
+var orientCubeRotY = 38;
+
+function applyOrientCubeTransform() {
+  var cube = document.getElementById('orientCube');
+  if (!cube) return;
+  // Clamp X so you don't flip upside-down forever
+  if (orientCubeRotX > 80) orientCubeRotX = 80;
+  if (orientCubeRotX < -80) orientCubeRotX = -80;
+  cube.style.transform = 'rotateX(' + orientCubeRotX + 'deg) rotateY(' + orientCubeRotY + 'deg)';
+}
+
+function syncOrientCube() {
+  var cube = document.getElementById('orientCube');
+  if (!cube) return;
+  var selected = (document.getElementById('upAxis') || {}).value || '+Y';
+  var faces = cube.querySelectorAll('.face');
+  for (var i = 0; i < faces.length; i++) {
+    var on = faces[i].getAttribute('data-axis') === selected;
+    if (on) faces[i].classList.add('selected');
+    else faces[i].classList.remove('selected');
+  }
+  applyOrientCubeTransform();
+}
+
+function initOrientCube() {
+  var cube = document.getElementById('orientCube');
+  var stage = document.getElementById('orientCubeStage');
+  if (!cube || !stage) return;
+
+  var dragging = false;
+  var moved = false;
+  var lastX = 0;
+  var lastY = 0;
+  var activePointer = null;
+
+  function onDown(e) {
+    if (e.button != null && e.button !== 0) return;
+    dragging = true;
+    moved = false;
+    activePointer = e.pointerId != null ? e.pointerId : 'mouse';
+    lastX = e.clientX;
+    lastY = e.clientY;
+    stage.classList.add('dragging');
+    if (stage.setPointerCapture && e.pointerId != null) {
+      try { stage.setPointerCapture(e.pointerId); } catch (err) {}
+    }
+    e.preventDefault();
+  }
+
+  function onMove(e) {
+    if (!dragging) return;
+    if (activePointer !== 'mouse' && e.pointerId != null && e.pointerId !== activePointer) return;
+    var dx = e.clientX - lastX;
+    var dy = e.clientY - lastY;
+    if (Math.abs(dx) + Math.abs(dy) > 3) moved = true;
+    orientCubeRotY += dx * 0.7;
+    orientCubeRotX -= dy * 0.7;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    applyOrientCubeTransform();
+    e.preventDefault();
+  }
+
+  function onUp(e) {
+    if (!dragging) return;
+    dragging = false;
+    stage.classList.remove('dragging');
+    activePointer = null;
+    // Click (no drag) on a face → set MODEL UP
+    if (!moved) {
+      var btn = e.target.closest ? e.target.closest('.face') : null;
+      if (!btn && e.target.classList && e.target.classList.contains('face')) btn = e.target;
+      if (btn) {
+        var axis = btn.getAttribute('data-axis');
+        if (axis) setModelUpAxis(axis);
+      }
+    }
+  }
+
+  stage.addEventListener('pointerdown', onDown);
+  stage.addEventListener('pointermove', onMove);
+  stage.addEventListener('pointerup', onUp);
+  stage.addEventListener('pointercancel', onUp);
+  // Block native click after drag so faces don't fire twice
+  cube.addEventListener('click', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+  });
+
+  applyOrientCubeTransform();
+  syncOrientCube();
+}
+
+function resetOrientation() {
+  document.getElementById('upAxis').value = '+Y';
+  document.getElementById('orientYaw').value = '0';
+  document.getElementById('orientPitch').value = '0';
+  document.getElementById('orientRoll').value = '0';
+  applyOrientation({ persist: true });
+  setStatus('Orientation reset to Blender/glTF Y-up');
+}
+
 /** Soften PBR so models aren't black without an env map (preview + AR). */
 function softenMaterials(root) {
   root.traverse(function(obj) {
@@ -207,9 +551,16 @@ function softenMaterials(root) {
       if (!m) continue;
       m = m.clone();
       mats[i] = m;
-      if (m.metalness !== undefined) m.metalness = Math.min(m.metalness, 0.2);
-      if (m.roughness !== undefined) m.roughness = Math.max(m.roughness, 0.4);
-      if (m.color && m.color.getHex() === 0x000000) m.color.setHex(0x999999);
+      if (m.metalness !== undefined) m.metalness = Math.min(m.metalness != null ? m.metalness : 0, 0.15);
+      if (m.roughness !== undefined) m.roughness = Math.max(m.roughness != null ? m.roughness : 0.5, 0.45);
+      if (m.color) {
+        var hex = m.color.getHex();
+        if (hex === 0x000000 || hex < 0x111111) m.color.setHex(0xaaaaaa);
+      }
+      if (m.emissive && m.emissive.getHex && m.emissive.getHex() === 0x000000 && m.color) {
+        // tiny fill so dark paint still reads under weak lights
+        m.emissive.setHex(0x111111);
+      }
       if (m.side !== undefined) m.side = THREE.DoubleSide;
       m.needsUpdate = true;
     }
@@ -218,88 +569,191 @@ function softenMaterials(root) {
 }
 
 function updateLightPositions() {
-  if (!previewKey) return;
   var deg = Number(document.getElementById('lightOrbit').value);
   var height = Number(document.getElementById('lightHeight').value);
   var rad = deg * Math.PI / 180;
   var radius = 4;
-  previewKey.position.set(Math.cos(rad) * radius, height, Math.sin(rad) * radius);
-  previewFill.position.set(Math.cos(rad + Math.PI) * 2.5, Math.max(0.5, height * 0.35), Math.sin(rad + Math.PI) * 2.5);
-  document.getElementById('lightOrbitVal').textContent = Math.round(deg) + '°';
-  document.getElementById('lightHeightVal').textContent = fmt(height, 1);
+  var kx = Math.cos(rad) * radius;
+  var kz = Math.sin(rad) * radius;
+  var fx = Math.cos(rad + Math.PI) * 2.5;
+  var fz = Math.sin(rad + Math.PI) * 2.5;
+  var fy = Math.max(0.5, height * 0.35);
+
+  if (previewKey) {
+    previewKey.position.set(kx, height, kz);
+    if (previewFill) previewFill.position.set(fx, fy, fz);
+  }
+  if (arKey) {
+    arKey.position.set(kx, height, kz);
+    if (arFill) arFill.position.set(fx, fy, fz);
+  }
+
+  var ov = document.getElementById('lightOrbitVal');
+  var hv = document.getElementById('lightHeightVal');
+  if (ov) ov.textContent = Math.round(deg) + '°';
+  if (hv) hv.textContent = fmt(height, 1);
 }
 
+/** Read sliders → preview (if any) + AR live. Settings you tweak are what you see on the marker. */
 function applyPreviewLightsFromUI(opts) {
   opts = opts || {};
-  if (!previewAmbient) return;
   var a = Number(document.getElementById('lightAmbient').value);
   var k = Number(document.getElementById('lightKey').value);
   var f = Number(document.getElementById('lightFill').value);
-  previewAmbient.intensity = a;
-  previewKey.intensity = k;
-  previewFill.intensity = f;
-  document.getElementById('lightAmbientVal').textContent = fmt(a);
-  document.getElementById('lightKeyVal').textContent = fmt(k);
-  document.getElementById('lightFillVal').textContent = fmt(f);
+
+  if (previewAmbient) {
+    previewAmbient.intensity = a;
+    previewKey.intensity = k;
+    previewFill.intensity = f;
+  }
+  if (arAmbient) {
+    arAmbient.intensity = a;
+    arKey.intensity = k;
+    if (arFill) arFill.intensity = f;
+  }
+
+  var av = document.getElementById('lightAmbientVal');
+  var kv = document.getElementById('lightKeyVal');
+  var fv = document.getElementById('lightFillVal');
+  if (av) av.textContent = fmt(a);
+  if (kv) kv.textContent = fmt(k);
+  if (fv) fv.textContent = fmt(f);
+
   updateLightPositions();
   if (opts.persist) saveSettings();
 }
 
 function applyLightsToAR() {
-  if (!arAmbient || !arKey) return;
-  // If preview exists, copy from preview; else from sliders/defaults
-  if (previewAmbient) {
-    arAmbient.intensity = previewAmbient.intensity;
-    arKey.intensity = previewKey.intensity;
-    arKey.position.copy(previewKey.position);
-    if (arFill && previewFill) {
-      arFill.intensity = previewFill.intensity;
-      arFill.position.copy(previewFill.position);
-    }
-  } else {
-    arAmbient.intensity = Number(document.getElementById('lightAmbient').value);
-    arKey.intensity = Number(document.getElementById('lightKey').value);
-  }
-  setStatus('Lighting applied to AR');
-  saveSettings();
+  applyPreviewLightsFromUI({ persist: true });
+  setStatus('Settings applied to AR (lights + saved)');
 }
 
 function collectSettings() {
+  var panel = null;
+  try {
+    panel = JSON.parse(localStorage.getItem(SETTINGS_KEY + '-panel') || 'null');
+  } catch (e) {}
   return {
     ambient: document.getElementById('lightAmbient').value,
     key: document.getElementById('lightKey').value,
     fill: document.getElementById('lightFill').value,
     orbit: document.getElementById('lightOrbit').value,
     height: document.getElementById('lightHeight').value,
-    arAmbient: arAmbient ? arAmbient.intensity : null,
-    arKey: arKey ? arKey.intensity : null,
+    upAxis: document.getElementById('upAxis').value,
+    orientYaw: document.getElementById('orientYaw').value,
+    orientPitch: document.getElementById('orientPitch').value,
+    orientRoll: document.getElementById('orientRoll').value,
+    modelUrl: activeModelUrl || '',
+    modelLabel: activeModelLabel || '',
+    webcamEnabled: !!webcamEnabled,
+    panel: panel,
+    version: 23,
     savedAt: Date.now()
   };
 }
 
-function saveSettings() {
-  try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(collectSettings()));
-    setStatus('Settings saved on this device');
-  } catch (e) {
-    setStatus('Could not save settings (private mode?)', true);
+function applySettingsObject(data) {
+  if (!data || typeof data !== 'object') return false;
+  if (data.ambient != null) document.getElementById('lightAmbient').value = data.ambient;
+  if (data.key != null) document.getElementById('lightKey').value = data.key;
+  if (data.fill != null) document.getElementById('lightFill').value = data.fill;
+  if (data.orbit != null) document.getElementById('lightOrbit').value = data.orbit;
+  if (data.height != null) document.getElementById('lightHeight').value = data.height;
+  if (data.upAxis != null) document.getElementById('upAxis').value = data.upAxis;
+  if (data.orientYaw != null) document.getElementById('orientYaw').value = data.orientYaw;
+  if (data.orientPitch != null) document.getElementById('orientPitch').value = data.orientPitch;
+  if (data.orientRoll != null) document.getElementById('orientRoll').value = data.orientRoll;
+  if (typeof data.webcamEnabled === 'boolean') webcamEnabled = data.webcamEnabled;
+  if (data.modelUrl) {
+    activeModelUrl = data.modelUrl;
+    activeModelLabel = data.modelLabel || data.modelUrl.split('/').pop();
   }
+  if (data.panel) {
+    try {
+      localStorage.setItem(SETTINGS_KEY + '-panel', JSON.stringify(data.panel));
+    } catch (e) {}
+  }
+  var phone = document.getElementById('upAxisPhone');
+  var desk = document.getElementById('upAxis');
+  if (phone && desk) phone.value = desk.value;
+  return true;
 }
 
-function loadSettings() {
+function saveSettings(opts) {
+  opts = opts || {};
+  var data = collectSettings();
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(data));
+  } catch (e) {}
+
+  // Debounce disk write so slider-drags don't spam the file
+  clearTimeout(_saveDiskTimer);
+  _saveDiskTimer = setTimeout(function() {
+    fetch(SETTINGS_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data, null, 2)
+    })
+      .then(function(r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      })
+      .then(function() {
+        if (opts.announce !== false) {
+          setStatus('Saved → settings.json (lights, orient, model)');
+        }
+      })
+      .catch(function(err) {
+        console.warn('[settings] disk save failed:', err);
+        if (opts.announce !== false) {
+          setStatus('Saved in browser only — run python serve.py to write settings.json', true);
+        }
+      });
+  }, opts.immediate ? 0 : 280);
+}
+
+function loadSettingsFromLocalStorage() {
   try {
     var raw = localStorage.getItem(SETTINGS_KEY);
     if (!raw) return false;
-    var data = JSON.parse(raw);
-    if (data.ambient != null) document.getElementById('lightAmbient').value = data.ambient;
-    if (data.key != null) document.getElementById('lightKey').value = data.key;
-    if (data.fill != null) document.getElementById('lightFill').value = data.fill;
-    if (data.orbit != null) document.getElementById('lightOrbit').value = data.orbit;
-    if (data.height != null) document.getElementById('lightHeight').value = data.height;
-    return true;
+    return applySettingsObject(JSON.parse(raw));
   } catch (e) {
     return false;
   }
+}
+
+/** Prefer disk settings.json (via API), fall back to localStorage.
+    Fire-and-forget — does not block rendering. */
+function loadSettingsAsync(done) {
+  fetch(SETTINGS_API + '?t=' + Date.now(), { cache: 'no-store' })
+    .then(function(r) {
+      if (!r.ok) throw new Error('no api');
+      return r.json();
+    })
+    .then(function(data) {
+      applySettingsObject(data);
+      try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(data)); } catch (e) {}
+      if (done) done(data);
+    })
+    .catch(function() {
+      fetch(SETTINGS_FILE + '?t=' + Date.now(), { cache: 'no-store' })
+        .then(function(r) {
+          if (!r.ok) throw new Error('no file');
+          return r.json();
+        })
+        .then(function(data) {
+          applySettingsObject(data);
+          try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(data)); } catch (e) {}
+          if (done) done(data);
+        })
+        .catch(function() {
+          if (done) done(null);
+        });
+    });
+}
+
+function loadSettings() {
+  return loadSettingsFromLocalStorage();
 }
 
 function resetLights() {
@@ -342,30 +796,112 @@ function wireLightControls() {
   });
   document.getElementById('lightResetBtn').addEventListener('click', resetLights);
   document.getElementById('lightSaveBtn').addEventListener('click', function() {
+    applyOrientation();
     applyLightsToAR();
     saveSettings();
   });
-  document.getElementById('lightApplyArBtn').addEventListener('click', applyLightsToAR);
+  document.getElementById('lightApplyArBtn').addEventListener('click', function() {
+    applyOrientation();
+    applyLightsToAR();
+  });
+}
+
+/** Double-click any range slider to restore its original default. */
+function wireSliderDoubleClickReset() {
+  var ranges = document.querySelectorAll('#previewPanel input[type="range"]');
+  for (var i = 0; i < ranges.length; i++) {
+    (function(el) {
+      if (!el.getAttribute('data-default')) {
+        el.setAttribute('data-default', el.defaultValue != null ? String(el.defaultValue) : el.value);
+      }
+      el.title = (el.title ? el.title + ' · ' : '') + 'double-click to reset';
+      el.addEventListener('dblclick', function() {
+        el.value = el.getAttribute('data-default');
+        var evIn = document.createEvent('HTMLEvents');
+        evIn.initEvent('input', true, false);
+        el.dispatchEvent(evIn);
+        var evCh = document.createEvent('HTMLEvents');
+        evCh.initEvent('change', true, false);
+        el.dispatchEvent(evCh);
+        setStatus('Reset ' + (el.id || 'slider') + ' → ' + el.value);
+      });
+    })(ranges[i]);
+  }
+}
+
+function wireOrientControls() {
+  function syncPhoneSelect() {
+    var phone = document.getElementById('upAxisPhone');
+    var desk = document.getElementById('upAxis');
+    if (phone && desk) phone.value = desk.value;
+  }
+  syncPhoneSelect();
+
+  ['upAxis', 'orientYaw', 'orientPitch', 'orientRoll'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('input', function() { applyOrientation(); syncPhoneSelect(); });
+    el.addEventListener('change', function() { applyOrientation({ persist: true }); syncPhoneSelect(); });
+  });
+
+  var phone = document.getElementById('upAxisPhone');
+  if (phone) {
+    phone.addEventListener('change', function() {
+      document.getElementById('upAxis').value = phone.value;
+      applyOrientation({ persist: true });
+      setStatus('UP set to ' + phone.value);
+    });
+  }
+
+  document.getElementById('orientResetBtn').addEventListener('click', resetOrientation);
+  document.getElementById('orientHoudiniBtn').addEventListener('click', function() {
+    document.getElementById('upAxis').value = '+Z';
+    document.getElementById('orientYaw').value = '0';
+    document.getElementById('orientPitch').value = '0';
+    document.getElementById('orientRoll').value = '0';
+    syncPhoneSelect();
+    applyOrientation({ persist: true });
+    setStatus('Orientation: Houdini/CAD Z-up → display Y-up');
+  });
+  document.getElementById('orientBlenderBtn').addEventListener('click', function() {
+    document.getElementById('upAxis').value = '+Y';
+    document.getElementById('orientYaw').value = '0';
+    document.getElementById('orientPitch').value = '0';
+    document.getElementById('orientRoll').value = '0';
+    syncPhoneSelect();
+    applyOrientation({ persist: true });
+    setStatus('Orientation: Blender/glTF Y-up');
+  });
 }
 
 function initPreview() {
-  // Skip heavy preview GL on pure phone UI
-  if (isPhoneUI()) return;
+  // Skip heavy preview GL when phone CSS hides the panel
+  if (!shouldInitPreview()) return;
 
   var wrap = document.getElementById('previewCanvasWrap');
-  var w = wrap.clientWidth || 260;
-  var h = wrap.clientHeight || 200;
+  var w = Math.max(wrap.clientWidth || 0, 280);
+  var h = Math.max(wrap.clientHeight || 0, 200);
 
   previewScene = new THREE.Scene();
-  previewScene.background = new THREE.Color(0x12121a);
+  previewScene.background = new THREE.Color(0x1c1c2a);
 
   previewCamera = new THREE.PerspectiveCamera(40, w / h, 0.01, 100);
-  previewCamera.position.set(1.6, 1.2, 2.0);
+  previewCamera.position.set(1.8, 1.25, 2.2);
 
-  previewRenderer = new THREE.WebGLRenderer({ antialias: true });
-  previewRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  previewRenderer.setSize(w, h);
+  previewRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+  previewRenderer.setClearColor(0x1c1c2a, 1);
+  previewRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  previewRenderer.setSize(w, h, false);
   wrap.appendChild(previewRenderer.domElement);
+  previewRenderer.domElement.addEventListener('webglcontextlost', function(e) {
+    e.preventDefault();
+    setStatus('Preview WebGL context lost — hard refresh (Ctrl+F5)', true);
+    console.error('[preview] webglcontextlost', e);
+  });
+  previewRenderer.domElement.addEventListener('webglcontextrestored', function() {
+    setStatus('Preview WebGL restored');
+    resizePreview();
+  });
 
   previewAmbient = new THREE.AmbientLight(0xffffff, 1.2);
   previewScene.add(previewAmbient);
@@ -405,20 +941,30 @@ function initPreview() {
   previewControls.zoomSpeed = 0.8;
   previewControls.target.set(0, 0.4, 0);
 
+  initOrientCube();
   wireLightControls();
+  wireOrientControls();
+  wireSliderDoubleClickReset();
   applyPreviewLightsFromUI();
+  setupFloatingPreview();
   window.addEventListener('resize', resizePreview);
+  // Layout may not be final on first paint — resize twice after flex settles
+  requestAnimationFrame(function() {
+    resizePreview();
+    requestAnimationFrame(resizePreview);
+  });
 }
 
 function resizePreview() {
   if (!previewRenderer) return;
   var wrap = document.getElementById('previewCanvasWrap');
+  if (!wrap) return;
   var w = wrap.clientWidth;
   var h = wrap.clientHeight;
-  if (!w || !h) return;
+  if (w < 2 || h < 2) return;
   previewCamera.aspect = w / h;
   previewCamera.updateProjectionMatrix();
-  previewRenderer.setSize(w, h);
+  previewRenderer.setSize(w, h, false);
 }
 
 function syncPreviewFromContent() {
@@ -428,24 +974,193 @@ function syncPreviewFromContent() {
     previewRoot.remove(previewRoot.children[0]);
   }
 
+  // Keep AR fit transforms (scale/position already applied by fitAndPlace / cube).
+  // Re-center for preview, then wrap with orientation quaternion.
   var clone = currentContent.clone(true);
-  clone.position.set(0, 0, 0);
-  clone.rotation.set(0, 0, 0);
-  clone.scale.set(1, 1, 1);
   softenMaterials(clone);
-  previewRoot.add(clone);
+  clone.updateMatrixWorld(true);
 
   var box = new THREE.Box3().setFromObject(clone);
   var size = box.getSize(new THREE.Vector3());
   var center = box.getCenter(new THREE.Vector3());
-  var maxDim = Math.max(size.x, size.y, size.z) || 1;
-  var s = 1.2 / maxDim;
-  clone.scale.setScalar(s);
-  clone.position.set(-center.x * s, -center.y * s + 0.35, -center.z * s);
+  var maxDim = Math.max(size.x, size.y, size.z);
+  if (!isFinite(maxDim) || maxDim < 1e-8) maxDim = 1;
+  var s = 1.15 / maxDim;
 
-  previewControls.target.set(0, 0.35, 0);
-  previewCamera.position.set(1.6, 1.1, 2.0);
-  previewControls.update();
+  var fitted = new THREE.Group();
+  fitted.add(clone);
+  fitted.scale.setScalar(s);
+  fitted.position.set(-center.x * s, -center.y * s, -center.z * s);
+
+  var wrap = new THREE.Group();
+  wrap.quaternion.copy(getOrientationQuaternion());
+  wrap.add(fitted);
+  wrap.position.y = 0.35;
+  previewRoot.add(wrap);
+
+  if (previewControls) {
+    previewControls.target.set(0, 0.35, 0);
+    previewCamera.position.set(1.8, 1.25, 2.2);
+    previewControls.update();
+  }
+  resizePreview();
+  logPreviewHealth(size, maxDim, s);
+}
+
+/** Paste in console: window.__previewHealth — diagnose black preview. */
+function logPreviewHealth(rawSize, maxDim, fitScale) {
+  var wrapEl = document.getElementById('previewCanvasWrap');
+  var canvas = previewRenderer ? previewRenderer.domElement : null;
+  var lightCount = 0;
+  if (previewScene) {
+    previewScene.traverse(function(o) {
+      if (o.isLight) lightCount++;
+    });
+  }
+  var info = {
+    previewInited: !!previewRenderer,
+    canvasCss: canvas ? (canvas.clientWidth + 'x' + canvas.clientHeight) : 'none',
+    canvasBuf: canvas ? (canvas.width + 'x' + canvas.height) : 'none',
+    wrapCss: wrapEl ? (wrapEl.clientWidth + 'x' + wrapEl.clientHeight) : 'none',
+    meshChildren: previewRoot ? previewRoot.children.length : 0,
+    lights: lightCount,
+    ambient: previewAmbient ? previewAmbient.intensity : null,
+    key: previewKey ? previewKey.intensity : null,
+    rawBBox: rawSize ? [rawSize.x, rawSize.y, rawSize.z] : null,
+    maxDim: maxDim,
+    fitScale: fitScale,
+    webglRenderers: 2,
+    note: 'Orbit Y / Height sliders move KEY LIGHT, not the camera'
+  };
+  window.__previewHealth = info;
+  console.log('[preview health]', info);
+  if (canvas && (canvas.clientWidth < 2 || canvas.clientHeight < 2)) {
+    setStatus('Preview canvas is 0×0 — resize the floating panel', true);
+  }
+}
+
+function setWebcamEnabled(on) {
+  webcamEnabled = !!on;
+  var btn = document.getElementById('webcamToggleBtn');
+  if (btn) {
+    btn.textContent = webcamEnabled ? 'Webcam ON' : 'Webcam OFF';
+    btn.className = webcamEnabled ? 'on' : '';
+  }
+  if (!arToolkitSource || !arToolkitSource.domElement) return;
+  var el = arToolkitSource.domElement;
+  try {
+    if (el.srcObject && el.srcObject.getTracks) {
+      el.srcObject.getTracks().forEach(function(track) {
+        track.enabled = webcamEnabled;
+      });
+    }
+  } catch (e) {}
+  el.style.opacity = webcamEnabled ? '1' : '0';
+  el.style.visibility = webcamEnabled ? 'visible' : 'hidden';
+  setStatus(webcamEnabled ? 'Webcam on' : 'Webcam off — model still tracks if marker was locked');
+}
+
+function setupFloatingPreview() {
+  if (!shouldInitPreview()) return;
+  var panel = document.getElementById('previewPanel');
+  var bar = document.getElementById('previewDragBar');
+  var grip = document.getElementById('previewResize');
+  var collapseBtn = document.getElementById('previewCollapseBtn');
+  if (!panel || !bar || !grip) return;
+
+  function setCollapsed(collapsed) {
+    if (collapsed) panel.classList.add('controls-collapsed');
+    else panel.classList.remove('controls-collapsed');
+    if (collapseBtn) collapseBtn.textContent = collapsed ? 'Show controls' : 'Hide controls';
+    requestAnimationFrame(function() {
+      resizePreview();
+      requestAnimationFrame(resizePreview);
+    });
+  }
+
+  // Restore size/pos
+  try {
+    var saved = JSON.parse(localStorage.getItem(SETTINGS_KEY + '-panel') || 'null');
+    if (saved) {
+      if (saved.w) panel.style.width = saved.w + 'px';
+      if (saved.h) panel.style.height = saved.h + 'px';
+      if (saved.left != null) { panel.style.left = saved.left + 'px'; panel.style.right = 'auto'; }
+      if (saved.top != null) panel.style.top = saved.top + 'px';
+      if (saved.collapsed) setCollapsed(true);
+    }
+  } catch (e) {}
+
+  function savePanelLayout() {
+    try {
+      localStorage.setItem(SETTINGS_KEY + '-panel', JSON.stringify({
+        w: panel.offsetWidth,
+        h: panel.offsetHeight,
+        left: panel.offsetLeft,
+        top: panel.offsetTop,
+        collapsed: panel.classList.contains('controls-collapsed')
+      }));
+    } catch (e) {}
+  }
+
+  // Drag from floating title bar
+  var dragging = false, dx = 0, dy = 0;
+  bar.addEventListener('mousedown', function(e) {
+    if (e.button !== 0) return;
+    dragging = true;
+    var rect = panel.getBoundingClientRect();
+    dx = e.clientX - rect.left;
+    dy = e.clientY - rect.top;
+    panel.style.right = 'auto';
+    e.preventDefault();
+  });
+  window.addEventListener('mousemove', function(e) {
+    if (!dragging) return;
+    var x = Math.max(0, Math.min(window.innerWidth - 80, e.clientX - dx));
+    var y = Math.max(0, Math.min(window.innerHeight - 40, e.clientY - dy));
+    panel.style.left = x + 'px';
+    panel.style.top = y + 'px';
+  });
+  window.addEventListener('mouseup', function() {
+    if (dragging) { dragging = false; savePanelLayout(); }
+  });
+
+  // Corner resize
+  var resizing = false, startX = 0, startY = 0, startW = 0, startH = 0;
+  grip.addEventListener('mousedown', function(e) {
+    resizing = true;
+    startX = e.clientX; startY = e.clientY;
+    startW = panel.offsetWidth; startH = panel.offsetHeight;
+    e.preventDefault();
+    e.stopPropagation();
+  });
+  window.addEventListener('mousemove', function(e) {
+    if (!resizing) return;
+    var nw = Math.max(240, Math.min(window.innerWidth - 8, startW + (e.clientX - startX)));
+    var nh = Math.max(300, Math.min(window.innerHeight - 8, startH + (e.clientY - startY)));
+    panel.style.width = nw + 'px';
+    panel.style.height = nh + 'px';
+    resizePreview();
+  });
+  window.addEventListener('mouseup', function() {
+    if (resizing) { resizing = false; savePanelLayout(); resizePreview(); }
+  });
+
+  if (collapseBtn) {
+    collapseBtn.textContent = panel.classList.contains('controls-collapsed') ? 'Show controls' : 'Hide controls';
+    collapseBtn.addEventListener('click', function() {
+      setCollapsed(!panel.classList.contains('controls-collapsed'));
+      savePanelLayout();
+    });
+  }
+
+  var camBtn = document.getElementById('webcamToggleBtn');
+  if (camBtn) {
+    camBtn.addEventListener('click', function() {
+      setWebcamEnabled(!webcamEnabled);
+    });
+  }
+
+  setTimeout(resizePreview, 50);
 }
 
 function setupTouchControls() {
@@ -600,6 +1315,8 @@ function initialize() {
 
   arToolkitSource.init(function onReady() {
     onResize();
+    // Re-apply webcam mute if user toggled before camera ready
+    setWebcamEnabled(webcamEnabled);
   });
 
   window.addEventListener('resize', function() {
@@ -634,39 +1351,75 @@ function initialize() {
   touchOrbit = new THREE.Group();
   smoothedRoot.add(touchOrbit);
 
+  orientRoot = new THREE.Group();
+  touchOrbit.add(orientRoot);
+
   contentRoot = new THREE.Group();
-  touchOrbit.add(contentRoot);
+  orientRoot.add(contentRoot);
 
-  // Restore saved lighting (per-browser / per-phone localStorage)
-  loadSettings();
+  // Always-visible pad on marker (under the model) so you know Hiro is locked even if mesh is dark
+  var padGeo = THREE.CircleGeometry
+    ? new THREE.CircleGeometry(0.6, 40)
+    : new THREE.PlaneGeometry(1.2, 1.2);
+  var markerPad = new THREE.Mesh(
+    padGeo,
+    new THREE.MeshBasicMaterial({
+      color: 0x00ff88,
+      transparent: true,
+      opacity: 0.35,
+      side: THREE.DoubleSide,
+      depthWrite: false
+    })
+  );
+  markerPad.rotation.x = -Math.PI / 2;
+  markerPad.position.y = 0.02;
+  markerPad.frustumCulled = false;
+  orientRoot.add(markerPad);
+
+  // ██████████████████████████████████████████████████████
+  // BOOT: orange cube on marker + preview IMMEDIATELY.
+  // Settings + model load are fire-and-forget after.
+  // ██████████████████████████████████████████████████████
+
+  loadSettings();   // localStorage only — fast, no network
   initPreview();
-  // Push slider values into AR lights (quiet — no status toast)
-  if (previewAmbient) {
-    applyPreviewLightsFromUI();
-    arAmbient.intensity = previewAmbient.intensity;
-    arKey.intensity = previewKey.intensity;
-    arKey.position.copy(previewKey.position);
-    if (arFill && previewFill) {
-      arFill.intensity = previewFill.intensity;
-      arFill.position.copy(previewFill.position);
+
+  if (isPhoneUI()) {
+    wireOrientControls();
+    wireSliderDoubleClickReset();
+  }
+
+  applyOrientation();
+  applyPreviewLightsFromUI();
+
+  showCube({ keepModelUrl: true, silent: false });
+  setStatus(isPhoneUI()
+    ? 'Orange cube ready — scan Hiro flyer'
+    : 'Orange cube on marker · loading model in background…');
+
+  // Fire-and-forget: fetch disk settings + load model
+  loadSettingsAsync(function(data) {
+    var url = (data && data.modelUrl) || MODEL_URL || '';
+    var label = (data && data.modelLabel) || url.split('/').pop() || '';
+    if (!url) {
+      setStatus('No modelUrl — orange cube only');
+      return;
     }
-  } else {
-    arAmbient.intensity = Number(document.getElementById('lightAmbient').value);
-    arKey.intensity = Number(document.getElementById('lightKey').value);
-    if (arFill) arFill.intensity = Number(document.getElementById('lightFill').value);
-  }
-
-  showCube();
-
-  if (MODEL_URL) {
-    loadModelFromUrl(MODEL_URL, MODEL_URL.split('/').pop());
-  }
-
-  document.getElementById('fileInput').addEventListener('change', onLocalFilePicked);
-  document.getElementById('resetCubeBtn').addEventListener('click', function() {
-    showCube();
-    setStatus('Reset to placeholder cube');
+    activeModelUrl = url;
+    activeModelLabel = label;
+    setTimeout(function() { loadModelFromUrl(url, label); }, 200);
   });
+
+  var fileInput = document.getElementById('fileInput');
+  if (fileInput) fileInput.addEventListener('change', onLocalFilePicked);
+  var resetBtn = document.getElementById('resetCubeBtn');
+  if (resetBtn) {
+    resetBtn.addEventListener('click', function() {
+      showCube({ keepModelUrl: false });
+      setStatus('Reset to orange cube');
+      saveSettings({ announce: false });
+    });
+  }
 }
 
 function clearContent() {
@@ -680,27 +1433,52 @@ function clearContent() {
   }
 }
 
-function showCube() {
+function showCube(opts) {
+  opts = opts || {};
   clearContent();
 
   var Geo = THREE.BoxGeometry || THREE.CubeGeometry;
   var geometry = new Geo(1, 1, 1);
-  var material = new THREE.MeshNormalMaterial({
+  // MeshBasicMaterial = always visible (no lights needed) — good AR "hello"
+  var material = new THREE.MeshBasicMaterial({
+    color: 0xff6600,
+    wireframe: false,
     transparent: true,
-    opacity: 0.5,
+    opacity: 0.85,
     side: THREE.DoubleSide
   });
+  // Rainbow overlay so it pops on camera
+  var shell = new THREE.Mesh(
+    geometry,
+    new THREE.MeshNormalMaterial({
+      transparent: true,
+      opacity: 0.55,
+      side: THREE.DoubleSide
+    })
+  );
 
   var cube = new THREE.Mesh(geometry, material);
-  cube.position.y = 0.5;
+  cube.position.y = 0.55;
+  cube.frustumCulled = false;
+  shell.position.y = 0.55;
+  shell.frustumCulled = false;
   contentRoot.add(cube);
+  contentRoot.add(shell);
   currentContent = cube;
 
   setBadge('Hello Cube');
-  setStatus(isPhoneUI()
-    ? 'Cube ready — point at marker, then swipe / pinch'
-    : 'Placeholder cube — load a local .glb to replace it');
+  if (!opts.keepModelUrl) {
+    activeModelUrl = '';
+    activeModelLabel = 'Hello Cube';
+  }
+  applyOrientation();
+  applyPreviewLightsFromUI();
   syncPreviewFromContent();
+  if (!opts.silent) {
+    setStatus(isPhoneUI()
+      ? 'Orange cube on marker when Hiro locks'
+      : 'Orange cube on marker · load a .glb to replace it');
+  }
 }
 
 function fitAndPlace(object3d) {
@@ -713,52 +1491,135 @@ function fitAndPlace(object3d) {
     throw new Error('Model has empty bounding box');
   }
 
-  var scale = 1.0 / maxDim;
+  // ~1 Hiro marker unit, sitting on the green pad
+  var scale = 1.15 / maxDim;
   object3d.scale.setScalar(scale);
   object3d.position.x = -center.x * scale;
-  object3d.position.y = -center.y * scale + 0.5;
+  object3d.position.y = -center.y * scale + 0.55;
   object3d.position.z = -center.z * scale;
+}
+
+function prepareContentMeshes(root) {
+  root.traverse(function(obj) {
+    obj.visible = true;
+    if (obj.isMesh) {
+      obj.frustumCulled = false;
+      obj.castShadow = false;
+      obj.receiveShadow = false;
+    }
+  });
 }
 
 function placeAsContent(object3d, label) {
   clearContent();
   softenMaterials(object3d);
   fitAndPlace(object3d);
+  prepareContentMeshes(object3d);
   contentRoot.add(object3d);
   currentContent = object3d;
   setBadge(label || 'Loaded model');
+  // Keep durable path if this load came from a normal URL (not blob:)
+  if (window.__pendingModelUrl && window.__pendingModelUrl.indexOf('blob:') !== 0) {
+    activeModelUrl = window.__pendingModelUrl;
+    activeModelLabel = label || activeModelUrl.split('/').pop();
+  }
+  applyOrientation();
+  applyPreviewLightsFromUI();
   syncPreviewFromContent();
+  saveSettings({ announce: false });
+  setStatus('Model ready for AR — saved into settings.json path');
 }
 
 function loadModelFromUrl(url, label) {
-  setStatus('Loading ' + (label || url) + '...');
-  var loader = new THREE.GLTFLoader();
-  loader.load(
-    url,
-    function(gltf) {
-      if (!gltf || !gltf.scene) {
-        setStatus('Loader returned no scene', true);
-        return;
-      }
-      try {
-        placeAsContent(gltf.scene, label || 'Model');
-        setStatus('Loaded ' + (label || url) + (isPhoneUI() ? ' — swipe / pinch to move' : ''));
-      } catch (e) {
-        setStatus(String(e.message || e), true);
-        showCube();
-      }
+  try {
+    if (!url) return;
+    var abs = url;
+    try { abs = new URL(url, window.location.href).href; } catch (e) {}
+
+    setStatus('Fetching: ' + (label || url) + '...');
+
+    // fetch for download (survives WebGL context loss — FileLoader XHR doesn't)
+    var controller = new AbortController();
+    var timeout = setTimeout(function() { controller.abort(); }, 60000);
+
+    fetch(abs, { signal: controller.signal, cache: 'no-store' })
+      .then(function(r) {
+        clearTimeout(timeout);
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        var cl = r.headers.get('Content-Length');
+        setStatus('Downloading: ' + (cl ? Math.round(cl/1024) + ' KB' : '...'));
+        return r.arrayBuffer();
+      })
+      .then(function(buf) {
+        if (!buf || !buf.byteLength) throw new Error('empty body');
+        setStatus('Parsing GLB (' + Math.round(buf.byteLength/1024) + ' KB)...');
+        var loader = new THREE.GLTFLoader();
+        loader.parse(buf, '', function(gltf) {
+          if (!gltf || !gltf.scene) {
+            setStatus('Parse returned no scene', true);
+            return;
+          }
+          try {
+            if (url.indexOf('blob:') !== 0) {
+              activeModelUrl = url;
+              activeModelLabel = label || url.split('/').pop();
+            }
+            placeAsContent(gltf.scene, label || 'Model');
+            window.__modelLoadedOk = true;
+            setStatus('MODEL LOADED: ' + (label || url));
+            saveSettings({ announce: false });
+          } catch (e) {
+            setStatus('Place error — orange cube stays', true);
+          }
+        }, function(parseErr) {
+          console.error('[AR] GLB parse error:', parseErr);
+          setStatus('GLB parse failed — orange cube stays', true);
+        });
+      })
+      .catch(function(err) {
+        clearTimeout(timeout);
+        console.error('[AR] GLB fetch error:', err);
+        if (err && err.name === 'AbortError') {
+          setStatus('GLB download timed out — orange cube stays', true);
+        } else {
+          setStatus('GLB fetch failed — orange cube stays', true);
+        }
+      });
+  } catch (e) {
+    console.error('[AR] loadModelFromUrl crash:', e);
+    setStatus('Load crash — orange cube stays', true);
+  }
+}
+
+function ingestLocalModelFile(file) {
+  setStatus('Uploading ' + file.name + ' to models/uploads for persistence...');
+  fetch('/api/upload-model', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/octet-stream',
+      'X-Filename': file.name
     },
-    function(xhr) {
-      if (xhr && xhr.total) {
-        var pct = Math.round(xhr.loaded / xhr.total * 100);
-        setStatus('Loading ' + (label || 'model') + ' — ' + pct + '%');
-      }
-    },
-    function(err) {
-      console.error('[AR] GLB load error:', err);
-      setStatus('Failed to load model — need real glTF (.glb).', true);
-    }
-  );
+    body: file
+  })
+    .then(function(r) {
+      if (!r.ok) throw new Error('upload HTTP ' + r.status);
+      return r.json();
+    })
+    .then(function(res) {
+      if (!res || !res.ok || !res.url) throw new Error((res && res.error) || 'upload failed');
+      activeModelUrl = res.url;
+      activeModelLabel = res.label || file.name;
+      loadModelFromUrl(res.url, activeModelLabel);
+      saveSettings({ announce: true });
+      setStatus('Saved model → ' + res.url + ' (in settings.json)');
+    })
+    .catch(function(err) {
+      console.warn('[upload] falling back to session blob:', err);
+      var url = URL.createObjectURL(file);
+      objectUrlToRevoke = url;
+      loadModelFromUrl(url, file.name);
+      setStatus('Model loaded for this session only — run python serve.py to persist uploads', true);
+    });
 }
 
 function onLocalFilePicked(e) {
@@ -782,9 +1643,7 @@ function onLocalFilePicked(e) {
         e.target.value = '';
         return;
       }
-      var url = URL.createObjectURL(file);
-      objectUrlToRevoke = url;
-      loadModelFromUrl(url, file.name);
+      ingestLocalModelFile(file);
       e.target.value = '';
     };
     headerReader.onerror = function() {
@@ -795,17 +1654,25 @@ function onLocalFilePicked(e) {
     return;
   }
 
-  var url = URL.createObjectURL(file);
-  objectUrlToRevoke = url;
-  loadModelFromUrl(url, file.name);
+  ingestLocalModelFile(file);
   e.target.value = '';
 }
 
 function update() {
-  if (arToolkitSource.ready !== false) {
-    arToolkitContext.update(arToolkitSource.domElement);
+  // Webcam may be denied / not ready — never let AR source kill the preview render loop
+  try {
+    if (arToolkitSource && arToolkitContext && arToolkitSource.domElement && arToolkitSource.ready !== false) {
+      arToolkitContext.update(arToolkitSource.domElement);
+    }
+    if (smoothedControls && markerRoot1) {
+      smoothedControls.update(markerRoot1);
+    }
+  } catch (err) {
+    if (!window.__arUpdateErrorLogged) {
+      window.__arUpdateErrorLogged = true;
+      console.warn('[AR] update skipped (camera/source):', err);
+    }
   }
-  smoothedControls.update(markerRoot1);
 
   currentRotY += (targetRotY - currentRotY) * 0.15;
   currentRotX += (targetRotX - currentRotX) * 0.15;
@@ -820,20 +1687,58 @@ function update() {
   }
 
   if (previewControls) previewControls.update();
+
+  // Marker lock feedback (Hiro found ↔ content appears)
+  var locked = !!(markerRoot1 && markerRoot1.visible);
+  if (locked !== window.__wasMarkerLocked) {
+    window.__wasMarkerLocked = locked;
+    if (locked) {
+      // Safety: never leave a locked marker with only the green pad
+      if (contentRoot && contentRoot.children.length === 0) {
+        showCube({ keepModelUrl: true, silent: true });
+      }
+      if (window.__modelLoadedOk) {
+        setStatus('MARKER LOCKED — ' + (activeModelLabel || 'model') + ' is on the green pad');
+      } else {
+        setStatus('MARKER LOCKED — still orange cube (wanted: ' + (activeModelLabel || MODEL_URL || 'model') + ')');
+      }
+    } else {
+      setStatus(window.__modelLoadedOk
+        ? ('Point at Hiro — ' + (activeModelLabel || 'model') + ' appears on green pad')
+        : ('Point at Hiro — orange cube until model loads (' + (activeModelLabel || MODEL_URL || '?') + ')'));
+    }
+  }
 }
 
 function render() {
-  renderer.render(scene, camera);
-  if (previewRenderer) previewRenderer.render(previewScene, previewCamera);
+  try {
+    if (renderer) renderer.render(scene, camera);
+  } catch (e) {}
+  try {
+    if (previewRenderer) previewRenderer.render(previewScene, previewCamera);
+  } catch (e) {}
 }
 
 function animate() {
   requestAnimationFrame(animate);
-  deltaTime = clock.getDelta();
-  totalTime += deltaTime;
-  update();
-  render();
+  try {
+    if (clock) {
+      deltaTime = clock.getDelta();
+      totalTime += deltaTime;
+    }
+    update();
+    render();
+  } catch (err) {
+    if (!window.__animateErrorLogged) {
+      window.__animateErrorLogged = true;
+      console.error('[AR] animate error:', err);
+      setStatus('Render loop error — see console', true);
+    }
+  }
 }
+
+initialize();
+animate();
 </script>
 
 </body>

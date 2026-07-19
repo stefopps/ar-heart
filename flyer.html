@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>MeWorld AR Flyer — Hello Cube</title>
+<title>MeWorld AR Flyer — v23</title>
 <style>
   @page { size:A4; margin:0.5cm; }
   body { font-family:system-ui,Arial,sans-serif; margin:0; padding:0; background:#fafafa; color:#222; }
@@ -76,13 +76,13 @@
 <body>
 <div class="page">
   <div class="header">
-    <h1>MeWorld AR — Hello Cube</h1>
-    <p>Pick local or GitHub • Point at the marker • Model appears in AR</p>
+    <h1>MeWorld AR</h1>
+    <p>Pick local or GitHub • Point at Hiro • Model + green pad when locked</p>
   </div>
 
   <div class="grid">
     <div class="card marker-card">
-      <div class="badge">v13</div>
+      <div class="badge">v29</div>
       <h2>Tracking Marker</h2>
       <img class="marker" src="hiro-marker.png" alt="Hiro Marker">
       <p class="blurb"><b>Aim your phone camera here</b> after opening either QR.</p>
@@ -92,16 +92,16 @@
       <div class="badge local">LOCAL</div>
       <h2>Phone — Local PC</h2>
       <img class="qr" src="qr-local.png" alt="Local QR code">
-      <p class="blurb">Same Wi‑Fi as this PC. Fast iterate, no GitHub wait.</p>
-      <p class="url">https://192.168.1.157:8443/index.html</p>
+      <p class="blurb">Same Wi‑Fi as this PC. Uses <code>serve.py</code> / HTTPS — settings save to <code>settings.json</code>.</p>
+      <p class="url">https://192.168.1.157:8443/index.html?v=29</p>
     </div>
 
     <div class="card">
       <div class="badge github">GITHUB</div>
       <h2>Phone — GitHub Pages</h2>
       <img class="qr" src="qr-iphone.png" alt="GitHub QR code">
-      <p class="blurb">Deployed site. Use a private tab if CDN is stale.</p>
-      <p class="url">https://stefopps.github.io/ar-heart/?v=13</p>
+      <p class="blurb">Deployed site. Use a private tab if CDN is stale. Push latest before relying on this.</p>
+      <p class="url">https://stefopps.github.io/ar-heart/?v=23</p>
     </div>
   </div>
 
@@ -111,13 +111,15 @@
       <li>Keep this flyer open on your PC (or print it).</li>
       <li>Scan <b>LOCAL</b> for live work on this machine, or <b>GITHUB</b> for the pushed build.</li>
       <li>Accept the camera prompt (and the cert warning on LOCAL).</li>
-      <li>Point at the Hiro marker on this page — the model appears above it.</li>
+      <li>Point at the Hiro marker — status should say <b>MARKER LOCKED</b> and a green pad appears under the model.</li>
+      <li>Desktop: lights / orientation auto-apply to AR and save into <code>settings.json</code>.</li>
     </ol>
   </div>
 
   <div class="footer">
     Baseline from <a href="https://github.com/stemkoski/AR-Examples">stemkoski/AR-Examples</a>
     • Racer archive: <code>archive/v10-crimson-racer</code>
+    • App: <code>index.html?v=23</code>
   </div>
 </div>
 </body>

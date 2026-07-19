@@ -1,0 +1,18 @@
+# Diagnostic / temp scripts and outputs
+_*.py
+_*.html
+_*.txt
+_*.png
+__pycache__/
+
+# Local dev screenshots
+preview-panel-crop.png
+preview-screenshot.png
+
+# TLS certs (local dev only — do not commit)
+cert.pem
+key.pem
+
+# Local uploaded models
+models/uploads/
+models/*.gltf.*.glb

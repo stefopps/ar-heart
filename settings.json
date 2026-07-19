@@ -1,0 +1,17 @@
+{
+  "ambient": "1.2",
+  "key": "1.8",
+  "fill": "0.6",
+  "orbit": "40",
+  "height": "5",
+  "upAxis": "+Y",
+  "orientYaw": "0",
+  "orientPitch": "0",
+  "orientRoll": "0",
+  "modelUrl": "models/retopology.glb",
+  "modelLabel": "retopology.glb",
+  "webcamEnabled": true,
+  "panel": null,
+  "version": 23,
+  "savedAt": 1784478051761
+}
