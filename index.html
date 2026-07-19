@@ -2,137 +2,25 @@
 <html>
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
-<title>AR Crimson Racer — MeWorld</title>
+<title>MeWorld AR — Hello Cube</title>
 <style>
   html, body { margin:0; padding:0; overflow:hidden; background:#000; font-family:system-ui,sans-serif; }
-  #ui { position:fixed; inset:0; z-index:10; pointer-events:none; }
-  #ui > * { pointer-events:auto; }
-
-  .top-bar {
-    display:flex; justify-content:space-between; padding:12px 16px;
-    background:linear-gradient(180deg,rgba(0,0,0,0.7) 0%,transparent 100%);
+  #badge {
+    position:fixed; top:12px; left:12px; z-index:10;
+    background:rgba(10,10,20,0.85); border:1px solid rgba(255,255,255,0.1);
+    border-radius:10px; padding:6px 12px; pointer-events:none;
   }
-  .badge {
-    background:rgba(10,10,20,0.85); backdrop-filter:blur(12px);
-    border:1px solid rgba(255,255,255,0.1); border-radius:10px; padding:6px 12px;
+  #badge .label { color:#888; font-size:9px; text-transform:uppercase; letter-spacing:1px; }
+  #badge .value { color:#e0e0e0; font-weight:600; font-size:13px; }
+  #hint {
+    position:fixed; bottom:24px; left:50%; transform:translateX(-50%); z-index:10;
+    color:#888; font-size:12px; text-align:center; pointer-events:none;
   }
-  .badge .label { color:#888; font-size:9px; text-transform:uppercase; letter-spacing:1px; }
-  .badge .value { color:#e0e0e0; font-weight:600; font-size:13px; }
-
-  .status-bar {
-    position:fixed; bottom:100px; left:50%; transform:translateX(-50%);
-    background:rgba(10,10,20,0.9); border:1px solid rgba(255,102,0,0.3);
-    border-radius:20px; padding:10px 24px; color:#ff6600; font-size:14px;
-    transition:all 0.4s; opacity:0;
-  }
-  .status-bar.visible { opacity:1; }
-  .status-bar.error { color:#ff5555; border-color:rgba(255,85,85,0.5); }
-  @keyframes pulse {
-    0%,100% { border-color:rgba(255,102,0,0.3); }
-    50% { border-color:rgba(255,102,0,0.8); }
-  }
-  .status-bar.found { animation:pulse 1.5s infinite; }
-
-  .info-panel {
-    position:fixed; right:12px; top:50%; transform:translateY(-50%);
-    background:rgba(10,10,20,0.9); backdrop-filter:blur(16px);
-    border:1px solid rgba(255,255,255,0.1); border-radius:14px;
-    padding:14px; width:170px; color:#e0e0e0; font-size:11px;
-    transition:all 0.5s cubic-bezier(0.16,1,0.3,1);
-    opacity:0; transform:translateY(-50%) translateX(20px);
-  }
-  .info-panel.visible { opacity:1; transform:translateY(-50%) translateX(0); }
-  .info-panel h3 { color:#ff6600; font-size:14px; margin:0 0 8px 0; }
-  .info-panel .row { display:flex; justify-content:space-between; padding:3px 0; border-bottom:1px solid rgba(255,255,255,0.06); }
-  .info-panel .key { color:#888; }
-  .info-panel .note { color:#666; font-size:9px; margin-top:8px; }
-
-  .marker-overlay {
-    position:fixed; top:0; left:0; right:0; z-index:100;
-    background:rgba(10,10,20,0.92); border-bottom:1px solid rgba(255,102,0,0.3);
-    padding:12px 16px; display:flex; align-items:center; gap:14px;
-    max-height:80px; overflow:hidden;
-  }
-  .marker-overlay.hidden { display:none; }
-  .marker-card { display:flex; align-items:center; gap:14px; color:#e0e0e0; width:100%; }
-  .marker-card h3 { color:#ff6600; font-size:14px; margin:0; white-space:nowrap; }
-  .marker-card p { color:#666; font-size:10px; margin:4px 0 0 0; white-space:nowrap; }
-  .marker-card .text-block { flex:1; min-width:0; }
-  .instructions {
-    position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
-    color:#888; font-size:12px; text-align:center; transition:opacity 0.5s;
-  }
-  .instructions.hidden { opacity:0; }
-
-  .touch-hint {
-    position:fixed; bottom:80px; left:50%; transform:translateX(-50%);
-    color:rgba(255,102,0,0.6); font-size:11px; text-align:center;
-    transition:opacity 0.5s; opacity:0; pointer-events:none;
-  }
-  .touch-hint.visible { opacity:1; }
-  .touch-hint.hidden { opacity:0; }
-
-  #loading {
-    position:fixed; inset:0; z-index:999; background:#0a0a0f;
-    display:flex; flex-direction:column; align-items:center; justify-content:center;
-    color:#e0e0e0; transition:opacity 0.6s; text-align:center; padding:20px; box-sizing:border-box;
-  }
-  #loading.gone { opacity:0; pointer-events:none; }
-  #loading .spinner {
-    width:36px; height:36px; border:3px solid rgba(255,255,255,0.1);
-    border-top-color:#ff6600; border-radius:50%; margin:16px 0;
-    animation:spin 0.8s linear infinite;
-  }
-  @keyframes spin { to { transform:rotate(360deg); } }
-  #loading p { font-size:14px; }
-  #loadMsg { color:#888; font-size:12px; max-width:420px; line-height:1.6; }
-  #loadMsg.error { color:#ff5555; }
 </style>
-</head>
-<body>
-
-<div id="loading">
-  <p>MeWorld AR — Crimson Racer</p>
-  <div class="spinner"></div>
-  <p id="loadMsg">Starting camera...</p>
-</div>
-
-<div id="ui">
-  <div class="top-bar">
-    <div class="badge"><div class="label">MeWorld AR</div><div class="value">Crimson Racer</div></div>
-    <div class="badge"><div class="label">Inspired</div><div class="value">@thesunkenblimp</div></div>
-  </div>
-</div>
-
-<div class="status-bar" id="status">Point camera at the Hiro marker on your flyer</div>
-<div class="info-panel" id="info">
-  <h3>Crimson Racer</h3>
-  <div class="row"><span class="key">Model</span><span class="val">GLTF 2.0</span></div>
-  <div class="row"><span class="key">Polygons</span><span class="val">Meshy AI</span></div>
-  <div class="row"><span class="key">Status</span><span class="val" id="statusVal">Ready</span></div>
-  <div class="note">Swipe to rotate<br>Pinch to zoom</div>
-</div>
-
-<div class="marker-overlay" id="markerOverlay">
-  <div class="marker-card">
-    <img src="hiro_marker.png" alt="Hiro Marker" style="width:52px;height:52px;border:2px solid #ff6600;border-radius:6px;">
-    <div class="text-block">
-      <h3>Point camera at this marker</h3>
-      <p>Show on another screen or print your flyer</p>
-    </div>
-  </div>
-</div>
-
-<div class="instructions" id="instr">Point camera at the &#x2B1B; <b>Hiro marker</b> &#x2B1B; on your printed flyer</div>
-<div class="touch-hint" id="touchHint">&#x270B; Swipe to rotate &nbsp; &#x1F44C; Pinch to zoom</div>
-
-<!-- v=10: Stemkoski hierarchy fix — smoothRoot as scene sibling + smoothControls.update each frame -->
+<!-- v=11 cube baseline: Stemkoski smoothed-controls hello cube + MeWorld flyer -->
 <script src="js/three.js"></script>
-<script src="js/GLTFLoader.js"></script>
 <script src="jsartoolkit5/artoolkit.min.js"></script>
 <script src="jsartoolkit5/artoolkit.api.js"></script>
 <script src="threex/threex-artoolkitsource.js"></script>
@@ -140,68 +28,57 @@
 <script src="threex/threex-arbasecontrols.js"></script>
 <script src="threex/threex-armarkercontrols.js"></script>
 <script src="threex/threex-arsmoothedcontrols.js"></script>
+</head>
+<body>
+
+<div id="badge">
+  <div class="label">MeWorld AR</div>
+  <div class="value">Hello Cube</div>
+</div>
+<div id="hint">Point camera at the Hiro marker on the flyer</div>
+
+<!--
+  Baseline adapted from Lee Stemkoski AR-Examples smoothed-controls.html
+  https://github.com/stemkoski/AR-Examples
+  Full crimson-racer history: branch archive/v10-crimson-racer
+-->
 
 <script>
-var scene, camera, renderer, clock;
-var arToolkitSource, arToolkitContext;
-var markerRoot, smoothRoot, touchOrbit, modelGroup;
-var smoothControls;
-var markerFound = false;
-var modelLoaded = false;
-
-var MODEL_URL = 'models/Meshy_AI_Crimson_Polygon_Racer_0717124504_texture.glb';
-var LOAD_TIMEOUT_MS = 45000;
-
-// Touch state
-var isTouching = false;
-var touchLastX = 0, touchLastY = 0;
-var touchStartDistance = 0;
-var touchStartScale = 1;
-var currentScale = 1;
-var targetRotY = 0, targetRotX = 0;
-var currentRotY = 0, currentRotX = 0;
-var autoRotateSpeed = 0.003;
-var modelLoadFinished = false;
+var scene, camera, renderer, clock, deltaTime, totalTime;
+var arToolkitSource, arToolkitContext, smoothedControls;
+var markerRoot1;
+var mesh1;
 
 initialize();
 animate();
 
 function initialize() {
-  console.log('[AR] three.js revision:', THREE.REVISION);
-
   scene = new THREE.Scene();
 
-  // === Better lighting (3-point setup like preview.html) ===
-  scene.add(new THREE.AmbientLight(0x404060, 0.8));
-  var key = new THREE.DirectionalLight(0xffffff, 1.5);
-  key.position.set(5, 8, 5);
-  scene.add(key);
-  var fill = new THREE.DirectionalLight(0xff8866, 0.6);
-  fill.position.set(-3, 2, -3);
-  scene.add(fill);
-  var rim = new THREE.DirectionalLight(0x6688ff, 0.5);
-  rim.position.set(0, 0, -5);
-  scene.add(rim);
+  var ambientLight = new THREE.AmbientLight(0xcccccc, 0.5);
+  scene.add(ambientLight);
 
   camera = new THREE.Camera();
   scene.add(camera);
 
-  // === Higher-quality renderer ===
-  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer = new THREE.WebGLRenderer({
+    antialias: true,
+    alpha: true
+  });
   renderer.setClearColor(new THREE.Color('lightgrey'), 0);
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.domElement.style.position = 'absolute';
   renderer.domElement.style.top = '0px';
   renderer.domElement.style.left = '0px';
   document.body.appendChild(renderer.domElement);
 
-  // === Touch interaction ===
-  setupTouchControls();
-
   clock = new THREE.Clock();
+  deltaTime = 0;
+  totalTime = 0;
 
-  arToolkitSource = new THREEx.ArToolkitSource({ sourceType:'webcam' });
+  arToolkitSource = new THREEx.ArToolkitSource({
+    sourceType: 'webcam'
+  });
 
   function onResize() {
     arToolkitSource.onResize();
@@ -213,236 +90,56 @@ function initialize() {
 
   arToolkitSource.init(function onReady() {
     onResize();
-    document.getElementById('loading').classList.add('gone');
-    document.getElementById('status').classList.add('visible');
-    // Auto-hide marker banner after 6s so camera is fully visible
-    setTimeout(function() {
-      var overlay = document.getElementById('markerOverlay');
-      overlay.style.transition = 'opacity 0.5s';
-      overlay.style.opacity = '0';
-      setTimeout(function() { overlay.classList.add('hidden'); }, 500);
-    }, 6000);
-  }, function onSourceError() {
-    setLoadMsg('Camera failed to start. Check camera permissions and reload.', true);
   });
 
-  window.addEventListener('resize', onResize);
+  window.addEventListener('resize', function() {
+    onResize();
+  });
 
   arToolkitContext = new THREEx.ArToolkitContext({
-    cameraParametersUrl:'data/camera_para.dat',
-    detectionMode:'mono'
+    cameraParametersUrl: 'data/camera_para.dat',
+    detectionMode: 'mono'
   });
 
   arToolkitContext.init(function onCompleted() {
     camera.projectionMatrix.copy(arToolkitContext.getProjectionMatrix());
   });
 
-  // === Scene hierarchy (canonical AR.js pattern) ===
-  // markerRoot   → scene sibling → ArMarkerControls sets its position from tracking
-  // smoothRoot   → scene sibling → ArSmoothedControls lerps it toward markerRoot
-  //   touchOrbit → child of smoothRoot → user touch rotation + pinch scale
-  //     modelGroup → child of touchOrbit → loaded GLB model
+  // Canonical Stemkoski hierarchy:
+  // markerRoot and smoothedRoot are SIBLINGS under scene
+  markerRoot1 = new THREE.Group();
+  scene.add(markerRoot1);
 
-  markerRoot = new THREE.Group();
-  scene.add(markerRoot);
-  new THREEx.ArMarkerControls(arToolkitContext, markerRoot, {
-    type:'pattern', patternUrl:'data/hiro.patt'
+  new THREEx.ArMarkerControls(arToolkitContext, markerRoot1, {
+    type: 'pattern',
+    patternUrl: 'data/hiro.patt'
   });
 
-  smoothRoot = new THREE.Group();
-  scene.add(smoothRoot);
-  smoothControls = new THREEx.ArSmoothedControls(smoothRoot, {
+  var smoothedRoot = new THREE.Group();
+  scene.add(smoothedRoot);
+  smoothedControls = new THREEx.ArSmoothedControls(smoothedRoot, {
     lerpPosition: 0.8,
-    lerpQuaternion: 0.2,
-    lerpScale: 0.7,
-    minVisibleDelay: 0,
-    minUnvisibleDelay: 0.2
+    lerpQuaternion: 0.8,
+    lerpScale: 1
   });
 
-  touchOrbit = new THREE.Group();
-  smoothRoot.add(touchOrbit);
-
-  modelGroup = new THREE.Group();
-  touchOrbit.add(modelGroup);
-
-  loadModel();
-
-  // Marker events
-  smoothControls.addEventListener('markerFound', function() {
-    markerFound = true;
-    var s = document.getElementById('status');
-    s.textContent = 'Crimson Racer detected \u2014 tracking';
-    s.classList.add('found');
-    document.getElementById('info').classList.add('visible');
-    document.getElementById('instr').classList.add('hidden');
-    document.getElementById('touchHint').classList.add('visible');
-  });
-  smoothControls.addEventListener('markerLost', function() {
-    markerFound = false;
-    var s = document.getElementById('status');
-    s.textContent = 'Marker lost \u2014 point camera at flyer';
-    s.classList.remove('found');
-    document.getElementById('info').classList.remove('visible');
-    document.getElementById('instr').classList.remove('hidden');
-    document.getElementById('touchHint').classList.remove('visible');
-  });
-}
-
-function setupTouchControls() {
-  var canvas = renderer.domElement;
-
-  canvas.addEventListener('touchstart', function(e) {
-    e.preventDefault();
-    isTouching = true;
-    if (e.touches.length === 1) {
-      touchLastX = e.touches[0].clientX;
-      touchLastY = e.touches[0].clientY;
-    } else if (e.touches.length === 2) {
-      var dx = e.touches[0].clientX - e.touches[1].clientX;
-      var dy = e.touches[0].clientY - e.touches[1].clientY;
-      touchStartDistance = Math.sqrt(dx*dx + dy*dy);
-      touchStartScale = currentScale;
-    }
-  }, {passive: false});
-
-  canvas.addEventListener('touchmove', function(e) {
-    e.preventDefault();
-    if (e.touches.length === 1 && isTouching) {
-      var dx = e.touches[0].clientX - touchLastX;
-      var dy = e.touches[0].clientY - touchLastY;
-      targetRotY += dx * 0.005;
-      targetRotX += dy * 0.005;
-      targetRotX = Math.max(-Math.PI/3, Math.min(Math.PI/3, targetRotX));
-      touchLastX = e.touches[0].clientX;
-      touchLastY = e.touches[0].clientY;
-    } else if (e.touches.length === 2) {
-      var dx2 = e.touches[0].clientX - e.touches[1].clientX;
-      var dy2 = e.touches[0].clientY - e.touches[1].clientY;
-      var dist = Math.sqrt(dx2*dx2 + dy2*dy2);
-      if (touchStartDistance > 0) {
-        var scaleFactor = dist / touchStartDistance;
-        currentScale = Math.max(0.3, Math.min(3.0, touchStartScale * scaleFactor));
-        touchOrbit.scale.setScalar(currentScale);
-      }
-    }
-  }, {passive: false});
-
-  canvas.addEventListener('touchend', function(e) {
-    if (e.touches.length === 0) {
-      isTouching = false;
-      touchStartDistance = 0;
-    }
+  var geometry1 = new THREE.CubeGeometry(1, 1, 1);
+  var material1 = new THREE.MeshNormalMaterial({
+    transparent: true,
+    opacity: 0.5,
+    side: THREE.DoubleSide
   });
 
-  // Mouse fallback for desktop debugging
-  var mouseDown = false;
-  canvas.addEventListener('mousedown', function(e) {
-    mouseDown = true;
-    touchLastX = e.clientX;
-    touchLastY = e.clientY;
-  });
-  canvas.addEventListener('mousemove', function(e) {
-    if (!mouseDown) return;
-    var dx = e.clientX - touchLastX;
-    var dy = e.clientY - touchLastY;
-    targetRotY += dx * 0.005;
-    targetRotX += dy * 0.005;
-    targetRotX = Math.max(-Math.PI/3, Math.min(Math.PI/3, targetRotX));
-    touchLastX = e.clientX;
-    touchLastY = e.clientY;
-  });
-  canvas.addEventListener('mouseup', function() { mouseDown = false; });
-  canvas.addEventListener('wheel', function(e) {
-    e.preventDefault();
-    currentScale = Math.max(0.3, Math.min(3.0, currentScale - e.deltaY * 0.001));
-    touchOrbit.scale.setScalar(currentScale);
-  }, {passive: false});
-}
-
-function loadModel() {
-  var loader = new THREE.GLTFLoader();
-
-  var timeoutId = setTimeout(function() {
-    if (modelLoadFinished) return;
-    document.getElementById('statusVal').textContent = 'Timeout';
-    console.error('[AR] Model load timed out after ' + (LOAD_TIMEOUT_MS/1000) + 's \u2014 check console and verify the .glb path.');
-  }, LOAD_TIMEOUT_MS);
-
-  try {
-    loader.load(MODEL_URL + '?v=' + Date.now(), function(gltf) {
-      modelLoadFinished = true;
-      modelLoaded = true;
-      clearTimeout(timeoutId);
-
-      if (!gltf || !gltf.scene) {
-        document.getElementById('statusVal').textContent = 'Error: no scene';
-        console.error('[AR] Loader returned no scene.');
-        return;
-      }
-
-      var model = gltf.scene;
-      var box = new THREE.Box3().setFromObject(model);
-      var size = box.getSize(new THREE.Vector3());
-      var maxDim = Math.max(size.x, size.y, size.z);
-
-      if (!isFinite(maxDim) || maxDim === 0) {
-        document.getElementById('statusVal').textContent = 'Error: empty model';
-        console.error('[AR] Model has zero bounding box.');
-        return;
-      }
-
-      var scale = 0.8 / maxDim;
-      model.scale.set(scale, scale, scale);
-      model.position.set(0, 0.3, 0);
-      modelGroup.add(model);
-      document.getElementById('statusVal').textContent = 'Loaded';
-      console.log('[AR] GLB loaded:', gltf);
-    }, function(xhr) {
-      if (modelLoadFinished) return;
-      if (xhr.total) {
-        var pct = Math.round(xhr.loaded / xhr.total * 100);
-        document.getElementById('statusVal').textContent = 'Loading ' + pct + '%';
-      }
-    }, function(err) {
-      modelLoadFinished = true;
-      clearTimeout(timeoutId);
-      document.getElementById('statusVal').textContent = 'Error';
-      console.error('[AR] GLB load error:', err);
-    });
-  } catch (e) {
-    modelLoadFinished = true;
-    clearTimeout(timeoutId);
-    document.getElementById('statusVal').textContent = 'Error';
-    console.error('[AR] Synchronous exception during load():', e);
-  }
-}
-
-function setLoadMsg(msg, isError) {
-  var el = document.getElementById('loadMsg');
-  el.textContent = msg;
-  if (isError) el.classList.add('error');
+  mesh1 = new THREE.Mesh(geometry1, material1);
+  mesh1.position.y = 0.5;
+  smoothedRoot.add(mesh1);
 }
 
 function update() {
   if (arToolkitSource.ready !== false) {
     arToolkitContext.update(arToolkitSource.domElement);
   }
-
-  // CRITICAL: ArSmoothedControls must be manually updated each frame
-  // with the markerRoot so it lerps smoothRoot toward the physical marker position
-  if (smoothControls) {
-    smoothControls.update(markerRoot);
-  }
-
-  // Smooth lerp rotation toward target (both touch and auto-rotate feed into this)
-  if (markerFound && !isTouching) {
-    targetRotY += autoRotateSpeed;
-  }
-  currentRotY += (targetRotY - currentRotY) * 0.1;
-  currentRotX += (targetRotX - currentRotX) * 0.1;
-  if (!modelLoaded) return;
-  touchOrbit.rotation.y = currentRotY;
-  touchOrbit.rotation.x = currentRotX;
+  smoothedControls.update(markerRoot1);
 }
 
 function render() {
@@ -451,9 +148,12 @@ function render() {
 
 function animate() {
   requestAnimationFrame(animate);
+  deltaTime = clock.getDelta();
+  totalTime += deltaTime;
   update();
   render();
 }
 </script>
+
 </body>
 </html>
